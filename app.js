@@ -1,3 +1,4 @@
+import { supabase } from './supabase.mjs';
 import {t,setLanguage,uiLocale} from './locale.mjs';
 import {lifts,liftResults,clanProfile,workoutRecord,workoutActivities,clanRequest,friendsRequest,profileRequest} from './clans.mjs';
 import {layout} from './assets/layout.js';
