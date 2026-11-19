@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#100d14">
+  <title>GymBro — Dziennik treningowy</title>
+  <meta name="description" content="Zapisuj treningi i zobacz pracujące partie na swoim GymBro.">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <svg class="material-defs" xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="material-bronze" color-interpolation-filters="sRGB">
+        <feColorMatrix type="saturate" values="0"/>
+        <feComponentTransfer>
+          <feFuncR type="table" tableValues=".08 .25 .55 .72 .89 1"/>
+          <feFuncG type="table" tableValues=".06 .15 .37 .49 .70 .96"/>
+          <feFuncB type="table" tableValues=".09 .21 .30 .36 .56 .90"/>
+        </feComponentTransfer>
+      </filter>
+      <filter id="material-silver" color-interpolation-filters="sRGB">
+        <feColorMatrix type="saturate" values="0"/>
+        <feComponentTransfer>
+          <feFuncR type="table" tableValues=".07 .17 .47 .66 .84 .97"/>
+          <feFuncG type="table" tableValues=".08 .24 .54 .73 .91 .99"/>
+          <feFuncB type="table" tableValues=".14 .32 .63 .81 .96 1"/>
+        </feComponentTransfer>
+      </filter>
+      <filter id="material-gold" color-interpolation-filters="sRGB">
+        <feColorMatrix type="saturate" values="0"/>
+        <feComponentTransfer>
+          <feFuncR type="table" tableValues=".09 .30 .61 .83 .97 1"/>
+          <feFuncG type="table" tableValues=".07 .20 .44 .66 .85 .96"/>
+          <feFuncB type="table" tableValues=".11 .14 .22 .35 .57 .86"/>
+        </feComponentTransfer>
+      </filter>
+      <filter id="material-diamond" color-interpolation-filters="sRGB">
+        <feColorMatrix type="saturate" values="0"/>
+        <feComponentTransfer>
+          <feFuncR type="table" tableValues=".07 .20 .39 .62 .82 .98"/>
+          <feFuncG type="table" tableValues=".10 .24 .55 .81 .96 1"/>
+          <feFuncB type="table" tableValues=".19 .44 .70 .87 1 1"/>
+        </feComponentTransfer>
+      </filter>
+    </defs>
+  </svg>
+  <header class="topbar"><div class="top-inner">
+    <a class="brand" href="#dom" aria-label="GymBro — Dom"><span class="brand-icon" data-icon="bolt"></span> <span>GYM<span>BRO</span></span></a>
+    <nav class="nav" aria-label="Nawigacja"></nav>
+    <div id="account-tools" class="account-tools"></div>
+  </div></header>
+  <main id="app"></main>
+  <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+  <aside id="rest-dock" class="rest-dock" aria-label="Timer przerwy" hidden></aside>
+  <div id="toast" role="status"></div>
+  <div id="record" role="status" aria-atomic="true"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
