@@ -119,7 +119,7 @@ async function buildClanSnapshot(userId) {
   return {
     self: userId,
     week,
-    clan: { id: clan.id, name: clan.name, tag: clan.tag, code: clan.code },
+    clan: { id: clan.id, name: clan.name, tag: clan.tag, code: clan.code, ownerId: clan.owner_id },
     members: (members ?? []).map(mapMember),
     messages: (msgs ?? []).map((m, idx) => ({
       seq: idx + 1,
@@ -160,6 +160,17 @@ export async function clanRequest(payload) {
   if (payload.action === 'leave') {
     await supabase.from('profiles').update({ clan_id: null }).eq('id', user.id);
     return buildClanSnapshot(user.id);
+  }
+
+  if (payload.action === 'kick') {
+    const { data: removed, error } = await supabase.rpc('gymbro_remove_clan_member', {
+      p_clan_id: String(payload.clanId),
+      p_member_id: payload.memberId,
+    });
+    if (error?.code === '42501') throw Error(t('Tylko lider może usunąć innego członka klanu.'));
+    if (error?.code === 'PGRST202') throw Error(t('Usuwanie członków wymaga aktualizacji bazy danych.'));
+    if (error) throw Error(t('Nie udało się usunąć członka klanu. Spróbuj ponownie.'));
+    return { removed, snapshot: await buildClanSnapshot(user.id) };
   }
 
   if (payload.action === 'chat') {
