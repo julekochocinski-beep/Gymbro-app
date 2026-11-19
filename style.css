@@ -473,6 +473,7 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .clan-invite strong{display:block;margin-top:3px;letter-spacing:.17em;color:#e7b0ff}
 .clan-code{text-transform:uppercase}
 .clan-members{display:grid;gap:7px}
+.clan-leader-badge{display:inline-block;vertical-align:middle;margin-inline-start:7px;padding:2px 8px;border:1px solid #7953a7;border-radius:999px;background:#412659;color:#eed3ff;font-size:.72rem;font-weight:750;white-space:nowrap}
 .clan-roster summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;min-height:44px}
 .clan-roster summary:focus-visible{outline:2px solid var(--purple);outline-offset:3px;border-radius:6px}
 .clan-roster summary::-webkit-details-marker{display:none}

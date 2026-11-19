@@ -586,6 +586,9 @@ function profileAvatar(person,own=false){
   if(own) return buddyModel('przod');
   return buddyModel('przod',null,null,{worn:person.worn??[],skin:person.previewSkin??person.skin??'default'});
 }
+function clanLeaderBadge(id){
+  return id===clanState.clan?.ownerId?'<span class="clan-leader-badge">'+t('Lider')+'</span>':'';
+}
 function clanMembers(){
   const members=clanState.members;
   const count=member=>member.week===clanState.week?member.workouts??0:0;
@@ -593,7 +596,7 @@ function clanMembers(){
     '<div class="clan-members">'+members.map(member=>
       '<button type="button" class="session-row" data-act="clan-member" data-key="'+esc(member.id)+'">'+
       portrait(member.photo,profileAvatar(member,member.id===clanState.self),'clan-avatar')+
-      '<span class="row-main"><span class="name">'+esc(member.nick)+(member.id===clanState.self?' '+t('· Ty'):'')+'</span>'+
+      '<span class="row-main"><span class="name">'+esc(member.nick)+(member.id===clanState.self?' '+t('· Ty'):'')+clanLeaderBadge(member.id)+'</span>'+
       '<span class="desc">'+t('Poziom')+' '+(member.level??1)+' '+t('· Treningi w tym tygodniu:')+' '+count(member)+'</span>'+
       '<span class="desc clan-tenure">'+tenureText(member.tenure)+'</span></span>'+icon('chevron')+'</button>'
     ).join('')+'</div>';
@@ -647,7 +650,43 @@ function showClan(){
 }
 function openClanMember(id){
   const member=clanState?.members?.find(entry=>entry.id===id);
-  if(member) openMemberProfile(member,'clan',' · '+tenureText(member.tenure)+' '+t('· Treningi w tym tygodniu:')+' '+(member.week===clanState.week?member.workouts??0:0));
+  if(!member) return;
+  const actions=canRemoveClanMember(id)?friendButton('clan-confirm-kick',id,t('Usuń z klanu'),'danger'):'';
+  openMemberProfile(member,'clan',' · '+tenureText(member.tenure)+' '+t('· Treningi w tym tygodniu:')+' '+(member.week===clanState.week?member.workouts??0:0),actions);
+}
+function canRemoveClanMember(id){
+  const clan=clanState?.clan;
+  return Boolean(clan&&clan.ownerId===clanState.self&&id!==clanState.self&&clanState.members.some(member=>member.id===id));
+}
+function confirmClanRemoval(id){
+  if(!canRemoveClanMember(id)) return;
+  const member=clanState.members.find(entry=>entry.id===id);
+  const message=t('Czy na pewno chcesz usunąć z klanu osobę o nicku {nick}?').replace('{nick}',()=>esc(member.nick));
+  openModal(t('Usunąć członka klanu?'),'<p class="meta">'+message+'</p>'+
+    '<p id="clan-kick-error" class="form-error" role="alert" hidden></p>'+
+    '<div class="controls">'+friendButton('clan-member',id,t('Wróć'))+
+    friendButton('clan-kick',id,t('Usuń z klanu'),'danger')+'</div>');
+}
+async function removeClanMember(id,button){
+  if(button.disabled||!canRemoveClanMember(id)) return;
+  const clanId=clanState.clan.id;
+  const errorBox=dialog.querySelector('#clan-kick-error');
+  button.disabled=true;
+  errorBox.hidden=true;
+  clanVersion++;
+  try{
+    const {removed,snapshot}=await clanRequest({action:'kick',clanId,memberId:id});
+    if(dialog.open&&dialog.contains(button)) dialog.close();
+    if(clanState?.clan?.id!==clanId) return;
+    clanVersion++;
+    applyClan(snapshot);
+    toast(t(removed?'Usunięto członka klanu.':'Ta osoba nie jest już w klanie.'));
+  }catch(error){
+    errorBox.textContent=error.message;
+    errorBox.hidden=false;
+  }finally{
+    button.disabled=false;
+  }
 }
 function setClanStatus(message){
   clanError=message;
@@ -672,6 +711,7 @@ function applyClan(snapshot,scrollToEnd=false){
   }
   if(!clanVisible()) return;
   if(!previous||(previous.clan?.id??null)!==clanId){
+    if(previous?.clan&&dialog.open) dialog.close();
     render();
     return;
   }
@@ -828,7 +868,7 @@ function openMemberProfile(person,source,detail='',actions=''){
   const recent=person.recent??[];
   const own=source==='clan'&&person.id===clanState.self;
   const preview=own?data.skinPreview:person.previewSkin;
-  openModal(esc(person.nick),'<div class="profile-identity">'+portrait(own?profilePhoto:person.photo)+'<p class="meta">'+t('Poziom')+' '+(person.level??1)+detail+'</p></div>'+
+  openModal(esc(person.nick),'<div class="profile-identity">'+portrait(own?profilePhoto:person.photo)+'<p class="meta">'+t('Poziom')+' '+(person.level??1)+detail+(source==='clan'?clanLeaderBadge(person.id):'')+'</p></div>'+
     '<div class="buddy-stage clan-profile-stage" style="'+modelMotionStyle()+'">'+profileAvatar(person,own)+'</div>'+
     (preview?'<p class="skin-test-badge">'+t('Skórka testowa')+'</p>':'')+
     liftCards(person.best)+'<section class="card card-pad profile-training"><h2>'+t('Ostatnie treningi')+'</h2>'+
@@ -1736,6 +1776,8 @@ document.addEventListener('click',async event=>{
       break;
     }
     case 'clan-member':openClanMember(key);break;
+    case 'clan-confirm-kick':confirmClanRemoval(key);break;
+    case 'clan-kick':removeClanMember(key,button);break;
     case 'clan-replay':{
       const body=clanState?.messages.find(message=>String(message.seq)===key)?.body;
       if(body?.kind==='pr') showRecord(body.label,body.kg,body.previous);
