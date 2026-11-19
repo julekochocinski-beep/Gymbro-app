@@ -10,6 +10,7 @@ import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,e
 import {filterSessions,monthGrid,moveMonth} from './progress.mjs';
 import {previewFrames} from './exercise-preview.mjs';
 import {armRestSound,playRestSignal} from './rest-signal.mjs';
+import {createRestPush} from './rest-push.mjs';
 import {skins,rankFor,unlockedSkin} from './skins.mjs';
 import {preparePhoto,saveProfilePhoto,readWorkoutPhoto,saveWorkoutPhoto,photoDataUrl,getWorkoutPhotoShare,setWorkoutPhotoShare,fetchSharedWorkoutPhoto,sharedWorkoutPhotoUrl} from './photos.mjs';
 
@@ -104,6 +105,9 @@ function toast(message){
   toastTimeout=setTimeout(()=>el.classList.remove('visible'),3500);
 }
 let currentUser=null, cloudSyncTimer=null;
+const restPush=createRestPush(supabase,updateRestPushSettings,message=>{if(!document.hidden) toast(t(message));});
+const restPushSignature=rest=>rest?JSON.stringify([rest.id,rest.deadline,data.language]):'';
+let savedRestPushSignature=restPushSignature(data.draft?.rest);
 function syncCloud(){
   if(!currentUser) return;
   clearTimeout(cloudSyncTimer);
@@ -128,6 +132,12 @@ function save(){
   } catch {
     storageOK=false;
     toast(t('Pamięć przeglądarki jest niedostępna. Dane zostaną w tej karcie do jej zamknięcia.'));
+  }
+  const rest=data.draft?.rest;
+  const signature=restPushSignature(rest);
+  if(signature!==savedRestPushSignature){
+    savedRestPushSignature=signature;
+    restPush.update(currentUser?.id,rest,data.language);
   }
 }
 function action(label,act,classes='ghost',glyph=''){
@@ -356,6 +366,25 @@ function updateSettingsPhoto(){
   container.innerHTML=portrait(profilePhoto);
   app.querySelector('#settings-photo-action').textContent=profilePhotoAction();
 }
+function restPushSettings(){
+  const {needsInstall,supported,ready,busy,error,subscribed,permission}=restPush.status(currentUser?.id);
+  if(needsInstall) return '<p class="meta">'+t('Otwórz GymBro z ikony na ekranie początkowym, żeby włączyć powiadomienia.')+'</p>';
+  if(!supported) return '<p class="meta">'+t('Ta przeglądarka nie obsługuje powiadomień GymBro.')+'</p>';
+  if(!currentUser) return '<p class="meta">'+t('Zaloguj się, żeby włączyć powiadomienia na tym urządzeniu.')+'</p>';
+  const status=error||(
+    permission==='denied'?t('Zezwól GymBro na powiadomienia w ustawieniach systemu.'):
+    subscribed?t('Powiadomienia włączone na tym urządzeniu.'):
+    ready?t('Powiadomienia wyłączone na tym urządzeniu.'):t('Przygotowywanie powiadomień…')
+  );
+  return '<p class="meta" role="status">'+esc(t(status))+'</p>'+
+    '<button class="btn ghost" type="button" data-act="'+(subscribed?'disable-rest-push':'enable-rest-push')+'"'+
+    (busy||!subscribed&&(!ready||permission==='denied')?' disabled':'')+'>'+
+    t(subscribed?'Wyłącz powiadomienia':'Włącz powiadomienia')+'</button>';
+}
+function updateRestPushSettings(){
+  const controls=app.querySelector('#rest-push-settings');
+  if(controls) controls.innerHTML=restPushSettings();
+}
 function showSettings(){
   const values=data.measurements;
   return heading(t('Ustawienia'),'')+'<div class="stack">'+
@@ -365,6 +394,9 @@ function showSettings(){
     '<label class="field">Hasło (min. 6 znaków)<input type="password" name="password" minlength="6" required placeholder="••••••"></label>'+
     '<div class="controls"><button type="submit" value="login" class="btn primary">Zaloguj się</button>'+
     '<button type="submit" value="register" class="btn ghost">Załóż konto</button></div></form>')+'</section>'+
+    '<section class="card card-pad stack"><h2>'+t('Powiadomienia o przerwie')+'</h2>'+
+    '<p class="meta">'+t('GymBro może dać znać o końcu przerwy także przy zablokowanym ekranie.')+'</p>'+
+    '<div class="stack" id="rest-push-settings">'+restPushSettings()+'</div></section>'+
     '<section class="card card-pad stack settings-photo"><div class="settings-photo-header"><div id="settings-photo-preview">'+portrait(profilePhoto)+'</div>'+
     '<div><h2>'+t('Zdjęcie profilowe')+'</h2><p class="meta">'+t('Widoczne dla członków Twojego klanu i zaakceptowanych znajomych.')+'</p></div></div>'+
     action('<span id="settings-photo-action">'+profilePhotoAction()+'</span>','profile-photo','ghost','camera')+'</section>'+
@@ -1622,9 +1654,15 @@ document.addEventListener('click',async event=>{
   const set=exercise?.sets[Number(idx)];
   switch(act){
     case 'auth-logout':
+      if(restPush.status(currentUser?.id).busy) break;
+      await restPush.disable(currentUser?.id);
       await supabase.auth.signOut();
       currentUser=null;nickname='';
       render();toast('Wylogowano');break;
+    case 'enable-rest-push':
+      await restPush.enable(currentUser?.id,()=>data.draft?.rest,()=>data.language);break;
+    case 'disable-rest-push':
+      await restPush.disable(currentUser?.id);break;
     case 'edit-nickname':editNickname();break;
     case 'profile-photo':openPhotoEditor();break;
     case 'workout-photo':openPhotoEditor(key);break;
@@ -1837,20 +1875,25 @@ async function loadCloudData(){
   if(prof?.username) nickname=prof.username;
   if(prof?.app_data&&typeof prof.app_data==='object'){
     data={...data,...prof.app_data};
+    savedRestPushSignature=restPushSignature(data.draft?.rest);
     localStorage.setItem(storage,JSON.stringify(data));
   }
+  restPush.retry(user.id);
 }
 render();
 loadCloudData().then(()=>{render();refreshNickname();syncSocialProfiles();});
 if(route()==='klan'&&!data.clanLink) refreshSocialTab();
 setInterval(()=>{if(route()==='klan'&&!document.hidden) refreshSocialTab();},3000);
 window.addEventListener('online',()=>{
+  restPush.retry(currentUser?.id);
   refreshNickname();
   syncSocialProfiles();
   if(route()==='klan') refreshSocialTab();
 });
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden) return;
+  updateRestPushSettings();
+  restPush.retry(currentUser?.id);
   refreshNickname();
   if(route()==='dom'||route()==='gymbro'){
     const cached=progressCache;
