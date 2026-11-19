@@ -91,7 +91,7 @@ function updateLocale(){
   document.querySelector('.nav').setAttribute('aria-label',t('Nawigacja'));
   restDock.setAttribute('aria-label',t('Timer przerwy'));
   clanTime=new Intl.DateTimeFormat(lang,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Warsaw'});
-  formatKg=new Intl.NumberFormat(lang,{maximumFractionDigits:8});
+  formatKg=new Intl.DateTimeFormat(lang,{maximumFractionDigits:8});
   monthFormatter=new Intl.DateTimeFormat(lang,{month:'long',year:'numeric',timeZone:'UTC'});
   fullDayFormatter=new Intl.DateTimeFormat(lang,{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
   formatter=new Intl.DateTimeFormat(lang,{day:'numeric',month:'long',timeZone:'Europe/Warsaw'});
@@ -103,10 +103,28 @@ function toast(message){
   el.classList.add('visible');
   toastTimeout=setTimeout(()=>el.classList.remove('visible'),3500);
 }
+let currentUser=null, cloudSyncTimer=null;
+function syncCloud(){
+  if(!currentUser) return;
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer=setTimeout(async()=>{
+    const p=currentProgress();
+    await supabase.from('profiles').update({
+      level:p.level,
+      xp:p.xp,
+      coins:p.coins,
+      equipped_skin:data.wardrobe.skin,
+      worn:data.wardrobe.worn,
+      app_data:data,
+      updated_at:new Date().toISOString(),
+    }).eq('id',currentUser.id);
+  },800);
+}
 function save(){
   try {
     localStorage.setItem(storage,JSON.stringify(data));
     storageOK=true;
+    syncCloud();
   } catch {
     storageOK=false;
     toast(t('Pamięć przeglądarki jest niedostępna. Dane zostaną w tej karcie do jej zamknięcia.'));
@@ -147,7 +165,6 @@ function segment(label,value,items,act){
     '<button type="button" aria-pressed="'+(id===value)+'" data-act="'+act+'" data-key="'+id+'">'+name+'</button>').join('')+'</div>';
 }
 function modelMotionStyle(){
-  // Keep the idle phase when changing outfits or views rebuilds the model.
   const elapsed=performance.now();
   return '--breath-delay:-'+(elapsed%4200).toFixed(0)+'ms;--aura-delay:-'+(elapsed%5600).toFixed(0)+'ms';
 }
@@ -342,6 +359,12 @@ function updateSettingsPhoto(){
 function showSettings(){
   const values=data.measurements;
   return heading(t('Ustawienia'),'')+'<div class="stack">'+
+    '<section class="card card-pad stack"><h2>Konto w chmurze (Supabase)</h2>'+
+    (currentUser?'<p class="meta">Zalogowano jako: <strong>'+esc(currentUser.email)+'</strong></p>'+action('Wyloguj się','auth-logout','ghost'):
+    '<form id="auth-form" class="stack"><label class="field">E-mail<input type="email" name="email" required placeholder="twoj@email.pl"></label>'+
+    '<label class="field">Hasło (min. 6 znaków)<input type="password" name="password" minlength="6" required placeholder="••••••"></label>'+
+    '<div class="controls"><button type="submit" value="login" class="btn primary">Zaloguj się</button>'+
+    '<button type="submit" value="register" class="btn ghost">Załóż konto</button></div></form>')+'</section>'+
     '<section class="card card-pad stack settings-photo"><div class="settings-photo-header"><div id="settings-photo-preview">'+portrait(profilePhoto)+'</div>'+
     '<div><h2>'+t('Zdjęcie profilowe')+'</h2><p class="meta">'+t('Widoczne dla członków Twojego klanu i zaakceptowanych znajomych.')+'</p></div></div>'+
     action('<span id="settings-photo-action">'+profilePhotoAction()+'</span>','profile-photo','ghost','camera')+'</section>'+
@@ -1522,10 +1545,21 @@ document.addEventListener('change',event=>{
     else {event.target.value=data.threshold;toast(t('Wpisz liczbę od 1 do 100.'));}
   }
 });
-document.addEventListener('submit',event=>{
+document.addEventListener('submit',async event=>{
   event.preventDefault();
   const form=event.target;
   const fields=new FormData(form);
+  if(form.id==='auth-form'){
+    const email=fields.get('email').trim();
+    const password=fields.get('password');
+    const isReg=event.submitter?.value==='register';
+    const res=isReg?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});
+    if(res.error){toast(res.error.message);return;}
+    currentUser=res.data.user;
+    toast(isReg?'Konto utworzone! Ustaw teraz swój nick poniżej.':'Zalogowano!');
+    await loadCloudData();
+    render();
+  }
   if(form.id==='measurements-form'){
     data.measurements=Object.fromEntries(measurementFields.flatMap(([id,,,min,max])=>{
       const value=Number(fields.get(id));
@@ -1579,7 +1613,7 @@ document.addEventListener('keydown',event=>{
   event.preventDefault();
   openMuscle(target.dataset.key);
 });
-document.addEventListener('click',event=>{
+document.addEventListener('click',async event=>{
   if(data.draft?.rest?.deadline>Date.now()) armRestSound();
   const button=event.target.closest('[data-act]');
   if(!button) return;
@@ -1587,6 +1621,10 @@ document.addEventListener('click',event=>{
   const exercise=data.draft?.exercises[Number(ex)];
   const set=exercise?.sets[Number(idx)];
   switch(act){
+    case 'auth-logout':
+      await supabase.auth.signOut();
+      currentUser=null;nickname='';
+      render();toast('Wylogowano');break;
     case 'edit-nickname':editNickname();break;
     case 'profile-photo':openPhotoEditor();break;
     case 'workout-photo':openPhotoEditor(key);break;
@@ -1791,9 +1829,19 @@ document.addEventListener('error',event=>{
 updateLocale();
 document.querySelector('[data-icon]').innerHTML=icon('bolt');
 openSkinTestLink();
+async function loadCloudData(){
+  const {data:{user}}=await supabase.auth.getUser();
+  currentUser=user;
+  if(!user) return;
+  const {data:prof}=await supabase.from('profiles').select('username,app_data').eq('id',user.id).maybeSingle();
+  if(prof?.username) nickname=prof.username;
+  if(prof?.app_data&&typeof prof.app_data==='object'){
+    data={...data,...prof.app_data};
+    localStorage.setItem(storage,JSON.stringify(data));
+  }
+}
 render();
-refreshNickname();
-syncSocialProfiles();
+loadCloudData().then(()=>{render();refreshNickname();syncSocialProfiles();});
 if(route()==='klan'&&!data.clanLink) refreshSocialTab();
 setInterval(()=>{if(route()==='klan'&&!document.hidden) refreshSocialTab();},3000);
 window.addEventListener('online',()=>{
