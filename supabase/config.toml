@@ -1,0 +1,4 @@
+project_id = "gymbro"
+
+[functions.rest-push]
+verify_jwt = false
