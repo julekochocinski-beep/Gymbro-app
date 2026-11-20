@@ -2,12 +2,14 @@ import { supabase } from './supabase.mjs';
 import {t,setLanguage,uiLocale} from './locale.mjs';
 import {lifts,liftResults,clanProfile,workoutRecord,workoutActivities,clanRequest,friendsRequest,profileRequest} from './clans.mjs';
 import {models,modelFor} from './models.mjs';
-import {items,wardrobeFrom,legacyProgress,progression,buyItem,toggleItem,toggleTattoo,XP_PER_DAY,XP_PER_RECORD,COINS_PER_LEVEL} from './gymbro.mjs';
+import {backgroundId,backgrounds,items,wardrobeFrom,legacyProgress,progression,buyItem,toggleItem,toggleTattoo,XP_PER_DAY,XP_PER_RECORD,COINS_PER_LEVEL} from './gymbro.mjs';
 import {placeTattoo,tattooAreas,tattooFits,tattooFrame,tattooInks,tattooSlots} from './tattoos.mjs';
 import {plans,muscles,standard,example,normalize,weightsFor,completedCount,newDraft,blankSet,newId,weightMilestone,exerciseHistory,numberedCompletedSets,exerciseConfig,MAX_PLAN_SETS,MAX_PLAN_REPS,elapsedSeconds,remainingSeconds,timeLabel,statsFor,dayKey,weekKeys,recentSessions} from './training.mjs';
 
 import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,exerciseTechnique,hasMachineSettings,isBodyweightExercise,matchesExercise} from './catalog.mjs';
 import {estimateOneRepMax,exerciseWeightTrend,filterSessions,latestMuscleWorkout,monthGrid,moveMonth,progressionAdvice,weeklyProgress} from './progress.mjs';
+import {instagramHandle,publicProfile} from './profile-extras.mjs';
+import {workoutCardBlob} from './share-card.mjs';
 import {previewFrames} from './exercise-preview.mjs';
 import {armRestSound,playRestSignal} from './rest-signal.mjs';
 import {createRestPush} from './rest-push.mjs';
@@ -70,6 +72,7 @@ let data={
   clanLink:previous?.clanLink??null,
   friendsId:previous?.friendsId??null,
   clanOutbox:previous?.clanOutbox??[],
+  profileExtras:previous?.profileExtras??null,
 };
 let side=preferredSide(data.sessions[0]), mode='ostatni', selectedSession=null;
 let toastTimeout, recordTimeout;
@@ -79,9 +82,11 @@ let pendingChat=null, clanVersion=0;
 let socialTab='klan', friendsState=null, friendsError='', friendsRead=null, friendsWriting=false, friendsAgain=false, lastFriendsProfile='';
 let nickname='', nicknameRead=null, nicknameWriting=false;
 let profilePhoto=null, photoWriting=false, draftPhotoPreview=null;
+let shareCardUrl=null;
 let progressCacheKey, progressCache;
 
 let avatarSide='przod', wardrobeTab=data.wardrobe.owned.length?'garderoba':'sklep', tryOn=null;
+let previewBackground=null;
 let wardrobeFilter='all', tattooArea='chest', tattooSlot='chest', tattooColor='black';
 const wardrobeFilters=[['all','Wszystko'],['clothes','Ubrania'],['accessories','Akcesoria'],['tattoos','Tatuaże']];
 const progressState={month:dayKey(Date.now()).slice(0,7),day:null,query:'',order:'newest'};
@@ -114,8 +119,10 @@ const restPushSignature=rest=>rest?JSON.stringify([rest.id,rest.deadline,data.la
 let savedRestPushSignature=restPushSignature(data.draft?.rest);
 function syncCloud(){
   if(!currentUser) return;
+  const account=currentUser.id;
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer=setTimeout(async()=>{
+    if(currentUser?.id!==account) return;
     const p=currentProgress();
     await supabase.from('profiles').update({
       level:p.level,
@@ -123,9 +130,9 @@ function syncCloud(){
       coins:p.coins,
       equipped_skin:data.wardrobe.skin,
       worn:data.wardrobe.worn,
-      app_data:data,
+      app_data:{...data,publicProfile:publicProfile(data,account)},
       updated_at:new Date().toISOString(),
-    }).eq('id',currentUser.id);
+    }).eq('id',account);
   },800);
 }
 function save(){
@@ -322,7 +329,7 @@ function buddyModel(view,preview=null,shine=null,{worn=data.wardrobe.worn,tattoo
 function homeBuddy(){
   const player=currentProgress();
   return '<section class="card card-pad buddy-card"><div class="card-head"><h2>'+t('Twój GymBro')+'</h2>'+coinBalance(player.coins)+'</div>'+
-    '<a href="#gymbro" class="buddy-stage home-buddy" style="'+modelMotionStyle()+'" aria-label="'+t('Otwórz garderobę GymBro')+'">'+buddyModel('przod')+
+    '<a href="#gymbro" class="buddy-stage home-buddy" data-background="'+backgroundId(data.wardrobe.background)+'" style="'+modelMotionStyle()+'" aria-label="'+t('Otwórz garderobę GymBro')+'">'+buddyModel('przod')+
     '<span class="buddy-link">'+icon('shirt')+' '+t('Personalizuj')+' '+icon('arrow')+'</span></a>'+
     skinTestBadge()+xpBar(player)+streakInfo(player)+'</section>';
 }
@@ -401,7 +408,34 @@ function characterRows(){
       '<strong>'+t(model.name)+'</strong><span class="skin-state">'+(selected?icon('check')+' '+t('Aktywna'):t('Wybierz'))+'</span></button>';
   }).join('');
 }
+function backgroundRows(coins){
+  const {background,ownedBackgrounds}=data.wardrobe;
+  return '<div class="background-list">'+backgrounds.map(item=>{
+    const owned=item.price===0||ownedBackgrounds.includes(item.id);
+    const key=' data-key="'+item.id+'"';
+    return '<article class="background-card"><button type="button" class="background-swatch" data-background="'+item.id+'" data-act="preview-background"'+key+
+      ' aria-label="'+t('Przymierz')+' '+t(item.name)+'" aria-pressed="'+(previewBackground===item.id)+'"></button>'+
+      '<h3>'+t(item.name)+'</h3>'+
+      (item.price===null?'<p class="meta">'+t('Nagroda za Golema')+'</p>':
+        '<button type="button" class="btn ghost" data-act="equip-background"'+key+
+        ((owned&&background===item.id)||(!owned&&coins<item.price)?' disabled':'')+'>'+
+        (owned?t(background===item.id?'Aktywne':'Ustaw'):t('Kup')+' '+icon('coin')+' '+item.price)+'</button>')+'</article>';
+  }).join('')+'</div>';
+}
+function savedStyleRows(){
+  return '<div class="style-slots">'+Array.from({length:3},(_,index)=>{
+    const look=data.wardrobe.styles[index];
+    const key=' data-key="'+index+'"';
+    return '<article class="card card-pad"><h3>'+t('Styl')+' '+(index+1)+'</h3>'+
+      (look?'<p class="meta">'+t(modelFor(look.model).name)+' · '+t(backgrounds.find(item=>item.id===backgroundId(look.background)).name)+'</p>':
+        '<p class="meta">'+t('Pusty zestaw')+'</p>')+
+      '<div class="controls">'+(look?'<button type="button" class="btn ghost" data-act="load-style"'+key+'>'+t('Załóż')+'</button>':'')+
+      '<button type="button" class="btn ghost" data-act="save-style"'+key+'>'+t(look?'Zastąp stylem obecnym':'Zapisz obecny styl')+'</button></div></article>';
+  }).join('')+'</div>';
+}
 function wardrobeContent(coins){
+  if(wardrobeTab==='tla') return backgroundRows(coins);
+  if(wardrobeTab==='style') return savedStyleRows();
   if(wardrobeTab==='postacie') return characterRows();
   if(wardrobeTab==='skorki') return skinRows();
   const shown=items.filter(item=>(wardrobeTab==='sklep'||data.wardrobe.owned.includes(item.id))&&
@@ -419,12 +453,12 @@ function showGymBro(shine){
   return heading(t('Twój')+' <em>GymBro</em>',t('Personalizuj postać i odblokowuj ubranka za monety.'))+
     '<div class="stack"><section class="card card-pad buddy-card"><div class="card-head">'+
     segment(t('Widok GymBro'),avatarSide,[['przod',t('Przód')],['tyl',t('Tył')]],'avatar-side')+coinBalance(player.coins)+'</div>'+
-    '<div class="buddy-stage" style="'+modelMotionStyle()+'">'+buddyModel(avatarSide,tryOn,shine)+
+    '<div class="buddy-stage" data-background="'+backgroundId(previewBackground??data.wardrobe.background)+'" style="'+modelMotionStyle()+'">'+buddyModel(avatarSide,tryOn,shine)+
     (preview?'<span class="buddy-preview-tag">'+t('Przymiarka ·')+' '+t(preview.name)+'</span>':'')+'</div>'+skinTestBadge()+xpBar(player)+streakInfo(player)+
     '<p class="meta xp-note">'+XP_PER_DAY+' '+t('XP za pierwszy zapisany trening dnia, z mnożnikiem do ×1,5 za tygodnie z rzędu. Pierwszy nowy rekord dnia daje dodatkowe')+' '+XP_PER_RECORD+' '+t('XP. Za każdy awans dostajesz')+' '+COINS_PER_LEVEL+' '+t('monet')+'.</p></section>'+
     '<section class="card card-pad wardrobe-card"><h2>'+t('Personalizacja')+'</h2>'+
     '<div class="wardrobe-tabs">'+segment(t('Personalizacja'),wardrobeTab,[['garderoba',t('Garderoba')],['sklep',t('Sklep')],
-      ['skorki',t('Skórki')],['postacie',t('Postacie')]],'wardrobe-tab')+'</div>'+wardrobeContent(player.coins)+
+      ['skorki',t('Skórki')],['postacie',t('Postacie')],['tla',t('Tła')],['style',t('Style')]],'wardrobe-tab')+'</div>'+wardrobeContent(player.coins)+
     '</section></div>';
 }
 const measurementFields=[
@@ -483,6 +517,11 @@ function showSettings(){
     '<section class="card card-pad stack settings-nickname"><h2>'+t('Twój nick')+'</h2>'+
     '<p id="settings-nickname-label" '+(nickname?'':'hidden')+'>'+esc(nickname)+'</p>'+
     action('<span id="settings-nickname-action">'+nicknameAction()+'</span>','edit-nickname','ghost','edit')+'</section>'+
+    (currentUser?'<section class="card card-pad stack"><h2>Instagram</h2><form class="stack" id="instagram-form">'+
+    '<label class="field">'+t('Nazwa użytkownika lub link')+'<input name="instagram" value="'+esc(publicProfile(data,currentUser.id).instagram)+
+    '" placeholder="@twojnick" maxlength="250" autocomplete="off" autocapitalize="none" spellcheck="false"></label>'+
+    '<button type="submit" class="btn ghost">'+t('Zapisz Instagram')+'</button>'+
+    '<p class="meta">'+t('Zapisz puste pole, żeby usunąć link z profilu.')+'</p><p class="form-error" role="alert" hidden></p></form></section>':'')+
     '<section class="card card-pad stack"><h2>'+t('Język')+'</h2><label class="field">'+t('Język aplikacji')+'<select id="app-language">'+
     '<option value="pl" '+(data.language==='pl'?'selected':'')+'>Polski</option><option value="en" '+(data.language==='en'?'selected':'')+'>English</option></select></label></section>'+
     '<section class="card card-pad stack"><h2>'+t('Waga i wymiary')+'</h2>'+
@@ -511,7 +550,8 @@ function showMap(){
     '<div class="card-head"><h3>'+t('Zakres')+'</h3></div><div class="controls">'+segment(t('Zakres danych'),mode,[['ostatni',t('Trening')],['tydzien',t('7 dni')]],'range')+'</div>'+
     (data.sessions.length&&mode==='ostatni'?'<label class="field" style="margin-top:12px">'+t('Wybierz trening')+'<select id="session-select">'+data.sessions.map(s=>
       '<option value="'+esc(s.id)+'" '+(s.id===context.latest?.id?'selected':'')+'>'+formatter.format(s.finished)+' · '+esc(s.name)+'</option>').join('')+'</select></label>':'')+
-    '</section>'+mapCard(context)+'<section class="card card-pad"><h3>'+t('Partie mięśni')+'</h3><div class="muscle-list">'+chips+'</div></section>'+
+    '</section>'+mapCard(context)+(context.latest&&mode==='ostatni'?friendButton('share-workout-card',context.latest.id,t('Udostępnij kartę treningu'),'ghost full'):'')+
+    '<section class="card card-pad"><h3>'+t('Partie mięśni')+'</h3><div class="muscle-list">'+chips+'</div></section>'+
     (unknown?'<section class="card card-list"><h3>'+t('Nieprzypisane ćwiczenia')+'</h3><p class="meta">'+t('Wybierz pracujące mięśnie, żeby uwzględnić ćwiczenie na mapie.')+'</p>'+unknown+'</section>':'')+
     '<section class="card card-pad"><label class="field">'+t('Liczba ważonych serii do pełnego podświetlenia')+'<input id="threshold" type="number" min="1" max="100" step="1" value="'+data.threshold+'"></label></section></div>';
 }
@@ -692,7 +732,9 @@ function showPlanEditor(){
     action(t('Dodaj ćwiczenia'),'plan-picker','ghost full','plus')+'</section>'+
     '<button class="btn primary full" type="submit" value="'+(quick?'start':'save')+'">'+icon(quick?'play':'check')+(quick?' '+t('Rozpocznij trening'):' '+t('Zapisz plan'))+'</button>'+
     (quick?'<button class="btn ghost full" type="submit" value="save">'+t('Zapisz jako własny plan')+'</button>':'')+
-    '<div class="controls">'+action(t('Anuluj'),'cancel-plan')+(id?action(t('Usuń plan'),'delete-plan','danger'):'')+'</div></form>';
+    '<div class="controls">'+action(t('Anuluj'),'cancel-plan')+(id?action(t('Usuń plan'),'delete-plan','danger'):'')+'</div></form>'+
+    (id&&currentUser?'<div class="plan-sharing">'+friendButton('toggle-share-plan',id,t(data.profileExtras?.owner===currentUser.id&&
+      data.profileExtras?.planIds?.includes(id)?'Wycofaj udostępnienie':'Udostępnij zapisany plan'))+'</div>':'');
 }
 function showTraining(){
   if(planEdit) return showPlanEditor();
@@ -1022,8 +1064,11 @@ function openMemberProfile(person,source,detail='',actions=''){
   const recent=person.recent??[];
   const own=source==='clan'&&person.id===clanState.self;
   const preview=own?data.skinPreview:person.previewSkin;
+  const instagram=own&&currentUser?publicProfile(data,currentUser.id).instagram:person.instagram;
+  const plans=source==='friends'?person.plans??[]:[];
   openModal(esc(person.nick),'<div class="profile-identity">'+portrait(own?profilePhoto:person.photo)+'<p class="meta">'+t('Poziom')+' '+(person.level??1)+detail+(source==='clan'?clanLeaderBadge(person.id):'')+'</p></div>'+
-    '<div class="buddy-stage clan-profile-stage" style="'+modelMotionStyle()+'">'+profileAvatar(person,own)+'</div>'+
+    (instagram?'<a class="link" target="_blank" rel="noopener noreferrer" href="https://www.instagram.com/'+encodeURIComponent(instagram)+'/">Instagram · @'+esc(instagram)+'</a>':'')+
+    '<div class="buddy-stage clan-profile-stage" data-background="'+backgroundId(own?data.wardrobe.background:person.background)+'" style="'+modelMotionStyle()+'">'+profileAvatar(person,own)+'</div>'+
     (preview?'<p class="skin-test-badge">'+t('Skórka testowa')+'</p>':'')+
     liftCards(person.best)+'<section class="card card-pad profile-training"><h2>'+t('Ostatnie treningi')+'</h2>'+
     (recent.length?'<ul>'+recent.map(workout=>{
@@ -1032,11 +1077,32 @@ function openMemberProfile(person,source,detail='',actions=''){
       if(!workout.hasDetails) return '<li class="profile-workout-summary">'+photo+title+'<small class="meta">'+t('Brak szczegółów')+'</small></li>';
       return '<li><button class="session-row" type="button" data-act="shared-workout" data-source="'+source+'" data-peer="'+esc(person.id)+'" data-key="'+esc(workout.id)+'">'+photo+title+icon('chevron')+'</button></li>';
     }).join('')+'</ul>':'<p class="empty">'+t('Brak udostępnionych treningów.')+'</p>')+
-    '<p class="form-error" id="shared-workout-error" role="alert" hidden></p></section>'+actions+action(t('Gotowe'),'close','ghost full'));
+    '<p class="form-error" id="shared-workout-error" role="alert" hidden></p></section>'+
+    (plans.length?'<section class="card card-pad stack"><h2>'+t('Udostępnione plany')+'</h2>'+
+      plans.map(plan=>'<article class="stack"><h3>'+esc(plan.name)+'</h3><p class="meta">'+plan.exercises.slice(0,4).map(item=>esc(exerciseLabel(item.label))).join(' · ')+
+        (plan.exercises.length>4?' · +'+(plan.exercises.length-4):'')+'</p>'+
+        '<button type="button" class="btn ghost" data-act="copy-shared-plan" data-peer="'+esc(person.id)+'" data-key="'+esc(plan.id)+'">'+t('Skopiuj plan')+'</button></article>').join('')+'</section>':'')+
+    actions+action(t('Gotowe'),'close','ghost full'));
 }
 function openFriend(id){
   const friend=friendsState?.friends.find(person=>person.id===id);
   if(friend) openMemberProfile(friend,'friends','',friendButton('friend-confirm-remove',id,t('Usuń ze znajomych'),'danger'));
+}
+function copySharedPlan(peerId,planId){
+  const friend=friendsState?.friends.find(person=>person.id===peerId);
+  const plan=friend?.plans?.find(entry=>entry.id===planId);
+  if(!plan) return;
+  const name=plan.name.slice(0,53);
+  let copyName=name;
+  for(let copy=2;data.savedPlans.some(entry=>normalize(entry.name)===normalize(copyName));copy++) copyName=name+' ('+copy+')';
+  data.savedPlans.push({id:newId(),name:copyName,exercises:plan.exercises.map(exerciseConfig)});
+  save();dialog.close();go('trening');toast(t('Plan skopiowany'));
+}
+function ownProfileExtras(){
+  if(!currentUser) return null;
+  if(data.profileExtras?.owner!==currentUser.id)
+    data.profileExtras={owner:currentUser.id,planIds:[],instagram:''};
+  return data.profileExtras;
 }
 async function openSharedWorkout(button){
   const {source,peer,key}=button.dataset;
@@ -1234,13 +1300,14 @@ function openSkinTestLink(){
 }
 window.addEventListener('hashchange',()=>{
   openSkinTestLink();
-  if(route()!=='gymbro') tryOn=null;
+  if(route()!=='gymbro'){tryOn=null;previewBackground=null;}
   if(dialog.open) dialog.close();
   render();
   window.scrollTo(0,0);
   if(route()==='klan') refreshSocialTab();
 });
 function openModal(title,body,options={}){
+  if(shareCardUrl){URL.revokeObjectURL(shareCardUrl);shareCardUrl=null;}
   dialog.className=options.sheet?'picker-dialog':'';
   dialog.innerHTML='<div class="dialog-card"><div class="card-head"><h2 id="dialog-title">'+title+'</h2><button type="button" class="btn ghost" data-act="close" aria-label="'+t('Zamknij')+'">'+icon('x')+'</button></div>'+body+'</div>';
   if(!dialog.open) dialog.showModal();
@@ -1292,6 +1359,33 @@ function openMuscle(key){
 function workoutPhotoButton(id){
   return '<button type="button" class="btn ghost workout-photo-button" data-act="workout-photo" data-key="'+esc(id)+'">'+
     icon('camera')+' <span>'+t('Zdjęcie treningu')+'</span></button>';
+}
+async function openWorkoutCard(id){
+  const session=data.sessions.find(workout=>workout.id===id);
+  if(!session) return;
+  openModal(t('Karta treningu'),'<div class="stack" id="workout-card-preview"><p class="meta" role="status">'+t('Przygotowywanie karty…')+'</p></div>');
+  const preview=dialog.querySelector('#workout-card-preview');
+  try{
+    const blob=await workoutCardBlob(session,data.sessions,activeModel(),data.custom,uiLocale());
+    if(!dialog.open||!dialog.contains(preview)) return;
+    const file=new File([blob],'gymbro-trening.png',{type:'image/png'});
+    const url=URL.createObjectURL(blob);
+    shareCardUrl=url;
+    dialog.addEventListener('close',()=>{
+      if(shareCardUrl===url){URL.revokeObjectURL(url);shareCardUrl=null;}
+    },{once:true});
+    const canShare=typeof navigator.share==='function'&&navigator.canShare?.({files:[file]});
+    preview.innerHTML='<img class="share-card-preview" alt="'+t('Karta treningu')+'" src="'+url+'">'+
+      (canShare?'<button type="button" class="btn primary full" data-share-card>'+t('Udostępnij kartę')+'</button>':'')+
+      '<a class="btn ghost full" href="'+url+'" download="gymbro-trening.png">'+t('Pobierz PNG')+'</a>';
+    preview.querySelector('[data-share-card]')?.addEventListener('click',()=>{
+      navigator.share({files:[file],title:session.name}).catch(error=>{
+        if(error.name!=='AbortError') toast(t('Nie udało się udostępnić. Możesz pobrać PNG.'));
+      });
+    });
+  }catch{
+    if(dialog.open&&dialog.contains(preview)) preview.textContent=t('Nie udało się przygotować karty.');
+  }
 }
 function workoutPhotoImage(sharedId){
   return '<img class="workout-photo" alt="'+t('Zdjęcie treningu')+'" '+
@@ -1510,6 +1604,7 @@ function details(id){
   }).join('');
   openModal(esc(session.name),'<p class="meta">'+formatter.format(session.finished)+' '+t('· Serii:')+' '+completedCount(session)+' '+t('· Czas:')+' '+timeLabel(elapsedSeconds(session.started,session.finished),true)+'</p>'+workoutPhotoImage()+'<p class="meta workout-photo-visibility" hidden></p>'+
     journalBlock('workout',id,notes.note,undefined,notes.withFriend)+lines+
+    friendButton('share-workout-card',id,t('Udostępnij kartę treningu'),'ghost full')+
     '<button type="button" class="btn ghost" data-act="rename-session" data-key="'+esc(id)+'">'+icon('edit')+' '+t('Zmień nazwę')+'</button>'+
     '<button type="button" class="btn primary" data-act="session-map" data-key="'+esc(id)+'">'+t('Pokaż mapę')+' '+icon('arrow')+'</button>');
   const image=dialog.querySelector('.workout-photo');
@@ -1926,6 +2021,18 @@ document.addEventListener('submit',async event=>{
     save();
     if(storageOK) toast(t('Pomiary zapisane'));
   }
+  if(form.id==='instagram-form'){
+    const extras=ownProfileExtras();
+    if(!extras) return;
+    const handle=instagramHandle(fields.get('instagram'));
+    if(handle===null){
+      const error=form.querySelector('.form-error');
+      error.textContent=t('Podaj prawidłową nazwę lub link do profilu Instagram.');
+      error.hidden=false;
+      return;
+    }
+    extras.instagram=handle;save();render();toast(t(handle?'Instagram zapisany':'Instagram usunięty'));
+  }
   if(form.id==='nickname-form') submitNickname(form,event.submitter,fields.get('nick'));
   if(form.id==='photo-form') submitPhoto(form,fields.get('photo'),event.submitter?.value==='remove',fields.get('visibility'));
   if(form.id==='workout-journal') saveJournal(form,fields);
@@ -2051,6 +2158,7 @@ document.addEventListener('click',async event=>{
       if(friendsState?.self){data.friendsId=friendsState.self.id;lastFriendsProfile='';save();render();refreshFriends();}
       break;
     case 'friend-profile':openFriend(key);break;
+    case 'copy-shared-plan':copySharedPlan(button.dataset.peer,key);break;
     case 'friend-accept':modifyFriends({action:'accept',peer:key},button);break;
     case 'friend-decline':modifyFriends({action:'decline',peer:key},button);break;
     case 'friend-remove':modifyFriends({action:'remove',peer:key},button);break;
@@ -2091,9 +2199,43 @@ document.addEventListener('click',async event=>{
       break;
     }
     case 'wardrobe-tab':
-      wardrobeTab=key;tryOn=null;render();
+      wardrobeTab=key;tryOn=null;previewBackground=null;render();
       app.querySelector('[data-act="wardrobe-tab"][aria-pressed="true"]')?.focus({preventScroll:true});
       break;
+    case 'preview-background':
+      previewBackground=previewBackground===key?null:backgroundId(key);
+      render();
+      app.querySelector('[data-act="preview-background"][data-key="'+backgroundId(key)+'"]')?.focus({preventScroll:true});
+      break;
+    case 'equip-background':{
+      const item=backgrounds.find(entry=>entry.id===key);
+      if(!item||item.price===null) break;
+      if(item.price>0&&!data.wardrobe.ownedBackgrounds.includes(key)){
+        if(currentProgress().coins<item.price) break;
+        data.wardrobe.ownedBackgrounds.push(key);
+      }
+      data.wardrobe.background=key;
+      previewBackground=null;
+      rememberAppearance();render();syncSocialProfiles();
+      break;
+    }
+    case 'save-style':
+    case 'load-style':{
+      const index=Number(key);
+      if(!Number.isInteger(index)||index<0||index>2) break;
+      const wardrobe=data.wardrobe;
+      if(act==='save-style'){
+        const {model,skin,worn,tattoos,background}=wardrobe;
+        wardrobe.styles[index]={model,skin,worn:[...worn],tattoos:{...tattoos},background};
+      } else {
+        const look=wardrobe.styles[index];
+        if(!look) break;
+        data.wardrobe=wardrobeFrom({...wardrobe,...look});
+        data.skinPreview=null;
+      }
+      rememberAppearance();render();syncSocialProfiles();
+      break;
+    }
     case 'wardrobe-filter':
       wardrobeFilter=key;tryOn=null;render();
       app.querySelector('[data-act="wardrobe-filter"][aria-pressed="true"]')?.focus({preventScroll:true});
@@ -2147,6 +2289,7 @@ document.addEventListener('click',async event=>{
       }
       break;
     case 'details':details(key);break;
+    case 'share-workout-card':await openWorkoutCard(key);break;
     case 'assign':assign(key);break;
     case 'session-map':selectSession(data.sessions.find(s=>s.id===key));dialog.close();go('mapa');break;
     case 'start':start(key);break;
@@ -2165,6 +2308,16 @@ document.addEventListener('click',async event=>{
     case 'plan-from-workout':
       editPlan({id:null,name:data.draft.name,exercises:data.draft.exercises.map(item=>({...item,setCount:Math.max(1,Math.min(MAX_PLAN_SETS,item.sets.length))}))});
       break;
+    case 'toggle-share-plan':{
+      if(!data.savedPlans.some(plan=>plan.id===key)) break;
+      const extras=ownProfileExtras();
+      if(!extras) break;
+      const ids=new Set(extras.planIds);
+      if(ids.has(key)) ids.delete(key);
+      else ids.add(key);
+      extras.planIds=[...ids];save();render();
+      break;
+    }
     case 'cancel-plan':planEdit=null;render();break;
     case 'delete-plan':
       confirmModal(t('Usunąć plan?'),t('Plan zniknie z sekcji Moje plany. Zapisane treningi zostaną w historii.'),'confirm-delete-plan',t('Usuń plan'));

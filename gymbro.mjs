@@ -8,6 +8,14 @@ export const COINS_PER_LEVEL=10;
 const levelTarget=level=>100+(level-1)*50;
 const workoutXp=streak=>XP_PER_DAY+(streak>=2?5*Math.min(5,streak):0);
 
+export const backgrounds=[
+  {id:'aura',name:'Aura',price:0},
+  {id:'grid',name:'Siatka',price:25},
+  {id:'orbits',name:'Orbity',price:40},
+  {id:'forge',name:'Kuźnia',price:null},
+];
+export const backgroundId=id=>backgrounds.some(item=>item.id===id)?id:'aura';
+
 // Layer order follows the supplied clothing assets.
 export const items=[
   {id:'tank-white',name:'Biały tank top',slot:'Na tułów',wearSlot:'torso',category:'clothes',price:45,back:true},
@@ -20,12 +28,17 @@ export const items=[
 
 export function wardrobeFrom(stored){
   const owned=items.filter(item=>stored?.owned?.includes(item.id)).map(item=>item.id);
+  const ownedBackgrounds=backgrounds.filter(item=>item.price>0&&stored?.ownedBackgrounds?.includes(item.id)).map(item=>item.id);
+  const appearance=lookFrom(stored,owned,ownedBackgrounds);
+  const styles=Array.isArray(stored?.styles)?stored.styles.slice(0,3).map(style=>style?lookFrom(style,owned,ownedBackgrounds):null):[];
+  return {...appearance,owned,ownedBackgrounds,styles};
+}
+
+function lookFrom(stored,owned,ownedBackgrounds){
   const worn=[];
-  for(const id of owned){
-    const item=items.find(entry=>entry.id===id);
-    if(item.category!=='tattoos'&&stored?.worn?.includes(id)) equipItem(worn,item);
-  }
-  return {owned,worn,tattoos:tattoosFrom(stored?.tattoos,owned),skin:stored?.skin??'default',model:modelFor(stored?.model).id};
+  for(const item of items) if(item.category!=='tattoos'&&owned.includes(item.id)&&stored?.worn?.includes(item.id)) equipItem(worn,item);
+  return {worn,tattoos:tattoosFrom(stored?.tattoos,owned),skin:stored?.skin??'default',model:modelFor(stored?.model).id,
+    background:ownedBackgrounds.includes(stored?.background)?stored.background:'aura'};
 }
 
 function equipItem(worn,item){
@@ -82,7 +95,8 @@ export function progression(sessions,wardrobe,legacy,now=Date.now()){
   const thisWeek=weekStart(dayKey(now));
   const activeStreak=lastWeek===thisWeek||lastWeek===addDays(thisWeek,-7)?streak:0;
   const nextWorkoutXp=workoutXp(lastWeek===thisWeek?streak:activeStreak+1);
-  const spent=items.filter(item=>wardrobe.owned.includes(item.id)).reduce((sum,item)=>sum+item.price,0);
+  const spent=items.filter(item=>wardrobe.owned.includes(item.id)).reduce((sum,item)=>sum+item.price,0)+
+    backgrounds.filter(item=>wardrobe.ownedBackgrounds?.includes(item.id)).reduce((sum,item)=>sum+item.price,0);
   const earned=(legacy.level-1)*50+(level-legacy.level)*COINS_PER_LEVEL;
   return {xp,level,inLevel,target:levelTarget(level),coins:Math.max(0,earned-spent),streak:activeStreak,nextWorkoutXp};
 }

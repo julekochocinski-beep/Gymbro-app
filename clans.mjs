@@ -4,6 +4,8 @@ import { exerciseKey, exerciseLabel } from './catalog.mjs';
 import { unlockedSkin } from './skins.mjs';
 import { modelFor } from './models.mjs';
 import { tattoosFrom } from './tattoos.mjs';
+import { backgroundId } from './gymbro.mjs';
+import { instagramHandle,sharedPlansFrom } from './profile-extras.mjs';
 import { beatenRecords, completedBest, completedCount, dayKey, weekKeys } from './training.mjs';
 
 export const lifts = [
@@ -75,6 +77,9 @@ function mapMember(p) {
     tattoos: tattoosFrom(p.app_data?.wardrobe?.tattoos),
     skin: p.equipped_skin ?? 'default',
     model: modelFor(p.app_data?.wardrobe?.model).id,
+    background: backgroundId(p.app_data?.wardrobe?.background),
+    instagram: instagramHandle(p.app_data?.publicProfile?.instagram) ?? '',
+    plans: sharedPlansFrom(p.app_data?.publicProfile?.plans),
     previewSkin: p.preview_skin ?? null,
     week: p.week_key ?? '',
     workouts: p.week_workouts ?? 0,
