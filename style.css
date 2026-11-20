@@ -410,6 +410,9 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .challenge-card{display:grid;gap:10px;background:radial-gradient(ellipse at 2% 0%,#3e2850,#19131f 75%)}
 .challenge-card h2{font-size:17px}
 .challenge-card .card-head{margin-bottom:0}
+.mission-entry{grid-template-columns:auto minmax(0,1fr) auto;align-items:center;text-decoration:none}
+.mission-entry>svg{width:17px;height:17px;color:#d4a4f2}
+.mission-entry:hover,.mission-entry:focus-visible{border-color:#a96bcd}
 .challenge-status{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#ecd5ff;font-size:13px}
 .challenge-status span{display:flex;align-items:center;gap:4px;color:#edc783}
 .challenge-status svg,.golem-icon svg,.trophy-emblem svg{width:19px;height:19px}
@@ -424,6 +427,7 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .armor-zone strong{color:#e8c1ff;font-variant-numeric:tabular-nums}
 .armor-zone.cracked{border-color:#ca8752;background:#423124}
 .armor-zone.cracked strong,.golem-event .clan-activity-text{color:#f7cb86}
+.golem-waiting{border-inline-start:2px solid #c088e5;padding-inline-start:8px;color:#e8cbfb}
 .trophy-card{display:flex;align-items:center}
 .trophy-emblem{border-color:#8c623b;background:#46331f;color:#ffd998}
 .clan-muscle-members{display:grid;gap:6px;padding-left:20px;margin:0}

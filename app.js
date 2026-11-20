@@ -10,7 +10,7 @@ import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,e
 import {estimateOneRepMax,exerciseWeightTrend,filterSessions,latestMuscleWorkout,monthGrid,moveMonth,progressionAdvice,weeklyProgress} from './progress.mjs';
 import {instagramHandle,publicProfile} from './profile-extras.mjs';
 import {workoutCardBlob} from './share-card.mjs';
-import {MISSION_COINS,GOLEM_COINS,GOLEM_GOAL,golemZones,weeklyMissions,golemWorkout,sendGolemWorkout,golemSnapshot} from './challenges.mjs';
+import {MISSION_COINS,SEASON_COINS,GOLEM_COINS,GOLEM_GOAL,golemZones,weeklyMissions,golemWorkout,sendGolemWorkout,golemSnapshot,memberArtifacts} from './challenges.mjs';
 import {previewFrames} from './exercise-preview.mjs';
 import {armRestSound,playRestSignal} from './rest-signal.mjs';
 import {createRestPush} from './rest-push.mjs';
@@ -91,6 +91,7 @@ let profilePhoto=null, photoWriting=false, draftPhotoPreview=null;
 let shareCardUrl=null;
 let progressCacheKey, progressCache;
 let golemBattle=null, golemOwner=null, golemRead=null, golemAgain=false, golemError=false, clanMapSide='przod';
+let missionTab='weekly';
 
 let avatarSide='przod', wardrobeTab=data.wardrobe.owned.length?'garderoba':'sklep', tryOn=null;
 let previewBackground=null;
@@ -250,11 +251,12 @@ function sessionRows(sessions){
 }
 function currentProgress(){
   const now=Date.now();
-  const wins=ownGolemAward()?.wins??0;
-  const key=[data.sessions.length,data.wardrobe.owned.length,data.wardrobe.ownedBackgrounds.length,dayKey(now),data.weeklyMissionStart,data.xpBaseline.level,data.xpBaseline.through,data.xpBaseline.inLevel,wins].join('|');
+  const award=ownGolemAward();
+  const gameCoins=(award?.wins??0)*GOLEM_COINS+(award?.seasonWins??0)*SEASON_COINS;
+  const key=[data.sessions.length,data.wardrobe.owned.length,data.wardrobe.ownedBackgrounds.length,dayKey(now),data.weeklyMissionStart,data.xpBaseline.level,data.xpBaseline.through,data.xpBaseline.inLevel,gameCoins].join('|');
   if(key!==progressCacheKey){
     const mission=weeklyMissions(data.sessions,data.weeklyMissionStart,now);
-    progressCache=progression(data.sessions,data.wardrobe,data.xpBaseline,now,mission.earned+wins*GOLEM_COINS);
+    progressCache=progression(data.sessions,data.wardrobe,data.xpBaseline,now,mission.earned+gameCoins);
     progressCacheKey=key;
   }
   return progressCache;
@@ -458,7 +460,7 @@ function wardrobeContent(coins){
 function showGymBro(shine){
   const player=currentProgress();
   const preview=items.find(item=>item.id===tryOn?.id);
-  return heading(t('Twój')+' <em>GymBro</em>',t('Personalizuj postać i odblokowuj ubranka za monety.'))+
+  return heading(t('Twój')+' <em>GymBro</em>',t('Personalizuj postać i odblokowuj ubranka za monety.'),link(t('Artefakty'),'artefakty','btn ghost','trophy'))+
     '<div class="stack"><section class="card card-pad buddy-card"><div class="card-head">'+
     segment(t('Widok GymBro'),avatarSide,[['przod',t('Przód')],['tyl',t('Tył')]],'avatar-side')+coinBalance(player.coins)+'</div>'+
     '<div class="buddy-stage" data-background="'+backgroundId(previewBackground??data.wardrobe.background)+'" style="'+modelMotionStyle()+'">'+buddyModel(avatarSide,tryOn,shine)+
@@ -542,28 +544,54 @@ function showSettings(){
 function showHome(){
   const date='<span class="date">'+icon('calendar')+new Intl.DateTimeFormat(uiLocale(),{weekday:'long',day:'numeric',month:'long',timeZone:'Europe/Warsaw'}).format(Date.now())+'</span>';
   return heading(t('Twój')+' <em>'+t('trening.')+'</em>',t('Zapisuj treningi i zdobywaj poziomy ze swoim GymBro.'),date)+
-    '<div class="stack">'+trainingCard()+weeklyMissionCard()+homeBuddy()+golemTrophy()+weekCard()+
+    '<div class="stack">'+trainingCard()+
+    '<a href="#misje" class="card card-pad challenge-card mission-entry"><span class="golem-icon">'+icon('shield')+'</span>'+
+    '<div><h2>'+t('Misje')+'</h2><p class="meta">'+t('Tygodniowe i sezonowe')+'</p></div>'+icon('chevron')+'</a>'+homeBuddy()+weekCard()+
     '<section class="card card-list"><div class="card-head"><h3>'+t('Ostatni trening')+'</h3>'+link('Progress','historia','link','arrow')+'</div>'+
     sessionRows(data.sessions.slice(0,1))+'</section></div>';
 }
-function weeklyMissionCard(){
-  const {count}=weeklyMissions(data.sessions,data.weeklyMissionStart);
-  return '<section class="card card-pad challenge-card"><div class="card-head"><div><h2>'+t('Misja tygodniowa')+'</h2>'+
-    '<p class="meta">'+t('Zapisz trening w dwa różne dni tego tygodnia.')+'</p></div>'+coinBalance(MISSION_COINS)+'</div>'+
-    '<p class="challenge-status"><strong>'+count+'/2 '+t('dni treningowych')+'</strong>'+
+function missionCard(title,task,count,unit,coins,dates='',extra=''){
+  return '<section class="card card-pad challenge-card"><div class="card-head"><div><h2>'+title+'</h2>'+
+    (dates?'<p class="meta">'+dates+'</p>':'')+'<p class="meta">'+task+'</p></div>'+coinBalance(coins)+'</div>'+
+    '<p class="challenge-status"><strong>'+count+'/2 '+unit+'</strong>'+
     (count===2?'<span>'+icon('check')+' '+t('Nagroda przyznana')+'</span>':'')+'</p>'+
-    '<progress value="'+count+'" max="2" aria-label="'+t('Postęp misji tygodniowej')+'"></progress></section>';
+    '<progress value="'+count+'" max="2" aria-label="'+title+'"></progress>'+extra+'</section>';
+}
+function showMissions(){
+  const {count}=weeklyMissions(data.sessions,data.weeklyMissionStart);
+  const award=ownGolemAward();
+  const dates=award?.seasonStart&&award.seasonEnd?
+    fullDayFormatter.format(dateForKey(award.seasonStart))+' – '+fullDayFormatter.format(dateForKey(award.seasonEnd)):'';
+  const seasonal=missionCard(t('Misja sezonowa'),t('Weź udział w pokonaniu Golema w dwóch różnych tygodniach sezonu.'),
+    award?.seasonCount??0,t('tygodnie ze zwycięstwem'),SEASON_COINS,dates,
+    '<p class="meta">'+t('Dodatkowa nagroda · Odznaka Kuźni')+'</p>'+
+    (!currentUser?link(t('Zaloguj się'),'ustawienia','btn ghost'):''));
+  const weekly=missionCard(t('Misja tygodniowa'),t('Zapisz trening w dwa różne dni tego tygodnia.'),
+    count,t('dni treningowych'),MISSION_COINS);
+  return heading(t('Misje'),'',link(t('Dom'),'dom','btn ghost','home'))+
+    '<div class="stack"><div class="social-tabs">'+segment(t('Misje'),missionTab,
+      [['weekly',t('Tygodniowe')],['seasonal',t('Sezonowe')]],'mission-tab')+'</div>'+
+    (missionTab==='seasonal'?seasonal:weekly)+'</div>';
 }
 function ownGolemAward(){
   const award=data.golemAward;
   return currentUser&&award?.owner===currentUser.id?award:null;
 }
-function golemTrophy(){
-  const award=ownGolemAward();
-  if(!award?.wins||!award.firstAt) return '';
-  return '<section class="card card-pad challenge-card trophy-card"><div class="trophy-emblem">'+icon('trophy')+'</div><div><h3>'+
-    t('Odłamek pancerza Golema')+'</h3><p class="meta">'+t('Pierwsze zwycięstwo')+' · '+formatter.format(new Date(award.firstAt))+
-    ' · '+esc(award.firstClan??'')+'</p><p class="meta">'+t('Zwycięstwa')+' · '+award.wins+'</p></div></section>';
+function artifactTile(title,detail,glyph){
+  return '<article class="card card-pad challenge-card trophy-card"><div class="trophy-emblem">'+icon(glyph)+
+    '</div><div><h3>'+title+'</h3>'+detail+'</div></article>';
+}
+function artifactCollection(award){
+  const shard=award?.wins>0&&award.firstAt?artifactTile(t('Odłamek pancerza Golema'),
+    '<p class="meta">'+t('Pierwsze zwycięstwo')+' · '+formatter.format(new Date(award.firstAt))+
+    ' · '+esc(award.firstClan??'')+'</p><p class="meta">'+t('Zwycięstwa')+' · '+award.wins+'</p>','trophy'):'';
+  const badge=award?.seasonWins>0?artifactTile(t('Odznaka Kuźni'),
+    '<p class="meta">'+t('Ukończone misje sezonowe')+' · '+award.seasonWins+'</p>','shield'):'';
+  return shard+badge||'<p class="empty">'+t('Brak zdobytych artefaktów.')+'</p>';
+}
+function showArtifacts(){
+  return heading(t('Artefakty'),t('Trofea z walk klanowych i odznaki sezonowe.'),link(t('Wróć do GymBro'),'gymbro','btn ghost'))+
+    '<div class="stack">'+artifactCollection(ownGolemAward())+'</div>';
 }
 function showMap(){
   const context=mapData();
@@ -870,14 +898,17 @@ function clanGolemCard(){
   const battle=golemBattle?.clan===clanState?.clan?.id?golemBattle:null;
   const header='<div class="card-head"><div><h2>'+t('Żelazny Golem')+'</h2><p class="meta">'+t('Tygodniowa walka klanu')+'</p></div><span class="golem-icon">'+icon(battle?.won?'trophy':'shield')+'</span></div>';
   if(!battle) return header+'<p class="meta" role="status">'+t(golemError?'Walka klanu jest chwilowo niedostępna.':'Ładowanie walki klanu…')+'</p>';
-  const hint=battle.won?t('Klan pokonał Żelaznego Golema!'):
+  const waiting=battle.eligible===false&&battle.eligibleFrom;
+  const hint=waiting?t('Do walki i nagród dołączysz od {date}.')
+    .replace('{date}',()=>fullDayFormatter.format(dateForKey(battle.eligibleFrom))):
+    battle.won?t('Klan pokonał Żelaznego Golema!'):
     t(battle.attackedToday?'Twój atak na dziś już się liczy.':'Zapisz trening, aby trafić jedną lub więcej stref pancerza.');
   return header+'<div class="golem-armor">'+Object.entries(golemZones).map(([key,label])=>{
     const count=Math.min(battle.hits?.[key]??0,GOLEM_GOAL);
     return '<div class="armor-zone'+(count===GOLEM_GOAL?' cracked':'')+'">'+
       '<span>'+t(label)+'</span><strong>'+count+'/'+GOLEM_GOAL+'</strong>'+
       '<progress value="'+count+'" max="'+GOLEM_GOAL+'" aria-label="'+t(label)+'"></progress></div>';
-  }).join('')+'</div><p class="meta">'+hint+'</p><p class="meta">'+GOLEM_COINS+' '+t('monet i trofeum za udział w zwycięstwie.')+
+  }).join('')+'</div><p class="meta'+(waiting?' golem-waiting':'')+'">'+hint+'</p><p class="meta">'+GOLEM_COINS+' '+t('monet i trofeum za udział w zwycięstwie.')+
     '</p>'+action(t('Heatmapa klanu'),'clan-heatmap','ghost full','flame');
 }
 function updateClanGolemCard(){
@@ -1084,16 +1115,20 @@ function refreshGolem(){
       golemError=false;
       const last=ownGolemAward();
       const award={owner,...snapshot.trophy};
-      if(JSON.stringify(last)!==JSON.stringify(award)||pending.length){
+      const awardChanged=JSON.stringify(last)!==JSON.stringify(award);
+      if(awardChanged||pending.length){
         data.golemAward=award;
         save();
       }
       if(changed) updateClanGolemCard();
-      if(!last||last.wins!==award.wins){
-        if(route()==='dom'||route()==='gymbro') render();
+      if(awardChanged&&['dom','gymbro','artefakty','misje'].includes(route())) render();
+      if(last){
+        const golemReward=Math.max(0,award.wins-last.wins)*GOLEM_COINS;
+        const seasonReward=Math.max(0,(award.seasonWins??0)-(last.seasonWins??0))*SEASON_COINS;
+        if(golemReward||seasonReward){
+          toast((seasonReward?t('Misja sezonowa'):t('Nagroda za Golema'))+' · +'+(golemReward+seasonReward)+' '+t('monet'));
+        }
       }
-      if(last&&award.wins>last.wins)
-        toast(t('Nagroda za Golema')+' · +'+(award.wins-last.wins)*GOLEM_COINS+' '+t('monet'));
     }catch{
       if(currentUser?.id===owner&&!golemError){golemError=true;updateClanGolemCard();}
     }finally{
@@ -1196,6 +1231,8 @@ function openMemberProfile(person,source,detail='',actions=''){
     (instagram?'<a class="link" target="_blank" rel="noopener noreferrer" href="https://www.instagram.com/'+encodeURIComponent(instagram)+'/">Instagram · @'+esc(instagram)+'</a>':'')+
     '<div class="buddy-stage clan-profile-stage" data-background="'+backgroundId(own?data.wardrobe.background:person.background)+'" style="'+modelMotionStyle()+'">'+profileAvatar(person,own)+'</div>'+
     (preview?'<p class="skin-test-badge">'+t('Skórka testowa')+'</p>':'')+
+    '<section class="stack"><h2>'+t('Artefakty')+'</h2><div id="profile-artifacts" class="stack">'+
+    (own||!currentUser?artifactCollection(ownGolemAward()):'<p class="meta" role="status">'+t('Ładowanie artefaktów…')+'</p>')+'</div></section>'+
     liftCards(person.best)+'<section class="card card-pad profile-training"><h2>'+t('Ostatnie treningi')+'</h2>'+
     (recent.length?'<ul>'+recent.map(workout=>{
       const title='<span class="row-main"><strong>'+esc(workout.name)+'</strong><span class="desc">'+formatter.format(workout.finished)+' '+t('· Serie:')+' '+workout.sets+'</span></span>';
@@ -1209,6 +1246,21 @@ function openMemberProfile(person,source,detail='',actions=''){
         (plan.exercises.length>4?' · +'+(plan.exercises.length-4):'')+'</p>'+
         '<button type="button" class="btn ghost" data-act="copy-shared-plan" data-peer="'+esc(person.id)+'" data-key="'+esc(plan.id)+'">'+t('Skopiuj plan')+'</button></article>').join('')+'</section>':'')+
     actions+action(t('Gotowe'),'close','ghost full'));
+  if(!own) loadProfileArtifacts(person.id);
+}
+async function loadProfileArtifacts(memberId){
+  const owner=currentUser?.id;
+  if(!owner) return;
+  const panel=dialog.querySelector('#profile-artifacts');
+  if(!panel) return;
+  const update=markup=>{
+    if(currentUser?.id===owner&&dialog.open&&dialog.contains(panel)) panel.innerHTML=markup;
+  };
+  try{
+    update(artifactCollection(await memberArtifacts(memberId)));
+  }catch{
+    update('<p class="meta">'+t('Nie udało się wczytać artefaktów.')+'</p>');
+  }
 }
 function openFriend(id){
   const friend=friendsState?.friends.find(person=>person.id===id);
@@ -1391,7 +1443,8 @@ async function submitNickname(form,button,nick){
     button.disabled=false;
   }
 }
-const views={dom:showHome,trening:showTraining,klan:showSocial,gymbro:showGymBro,mapa:showMap,historia:showProgress,ustawienia:showSettings};
+const views={dom:showHome,trening:showTraining,klan:showSocial,gymbro:showGymBro,mapa:showMap,historia:showProgress,
+  ustawienia:showSettings,misje:showMissions,artefakty:showArtifacts};
 function renderAccount(){
   document.querySelector('#account-tools').innerHTML=accountTools();
 }
@@ -1431,6 +1484,7 @@ window.addEventListener('hashchange',()=>{
   render();
   window.scrollTo(0,0);
   if(route()==='klan') refreshSocialTab();
+  if(route()==='misje'||route()==='artefakty') refreshGolem();
 });
 function openModal(title,body,options={}){
   if(shareCardUrl){URL.revokeObjectURL(shareCardUrl);shareCardUrl=null;}
@@ -2225,6 +2279,11 @@ document.addEventListener('click',async event=>{
   const set=exercise?.sets[Number(idx)];
   switch(act){
     case 'one-rep-max':openOneRepMax();break;
+    case 'mission-tab':
+      missionTab=key==='seasonal'?'seasonal':'weekly';
+      render();
+      app.querySelector('[data-act="mission-tab"][aria-pressed="true"]')?.focus({preventScroll:true});
+      break;
     case 'auth-logout':
       if(restPush.status(currentUser?.id).busy) break;
       await restPush.disable(currentUser?.id);
@@ -2588,7 +2647,7 @@ document.addEventListener('visibilitychange',()=>{
   restPush.retry(currentUser?.id);
   refreshGolem();
   refreshNickname();
-  if(route()==='dom'||route()==='gymbro'){
+  if(route()==='dom'||route()==='gymbro'||route()==='misje'){
     const cached=progressCache;
     if(currentProgress()!==cached) render();
   }

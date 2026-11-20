@@ -2,6 +2,7 @@ import {completedCount,dayKey,muscles,weekStart,weightsFor} from './training.mjs
 import {supabase} from './supabase.mjs';
 
 export const MISSION_COINS=5;
+export const SEASON_COINS=20;
 export const GOLEM_COINS=15;
 export const GOLEM_GOAL=3;
 export const golemZones={chest:'Klatka piersiowa',back:'Plecy',legs:'Nogi'};
@@ -45,6 +46,12 @@ export async function sendGolemWorkout(workout){
 
 export async function golemSnapshot(){
   const {data,error}=await supabase.rpc('gymbro_golem_snapshot');
+  if(error) throw error;
+  return data;
+}
+
+export async function memberArtifacts(memberId){
+  const {data,error}=await supabase.rpc('gymbro_member_artifacts',{p_member_id:memberId});
   if(error) throw error;
   return data;
 }
