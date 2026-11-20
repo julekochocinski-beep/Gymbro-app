@@ -166,13 +166,18 @@ input,select{min-width:0;width:100%;min-height:43px;color:var(--text);background
 .set-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .set-card-head strong{font-size:.875rem}
 .set-card-actions{display:grid;grid-template-columns:repeat(2,44px);gap:4px}
-.previous-set strong{color:#e2c9fb;font-variant-numeric:tabular-nums}
+.previous-set strong{color:var(--muted);font-variant-numeric:tabular-nums}
 .set-card-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.set-card-fields input::placeholder{color:var(--muted);opacity:1}
 .icon-btn{display:inline-grid;place-items:center;border:1px solid #3f304d;background:#261d2f;color:#cfc1d9;border-radius:8px;min-height:42px;width:100%;padding:0}
 .icon-btn svg{width:17px;height:17px}
 .icon-btn[aria-pressed="true"]{color:#efdcff;border-color:#a05bdd;background:#46245c}
 .icon-btn.del{background:transparent;border-color:transparent}
-.exercise .add-set{margin-top:9px}
+.exercise-toolbar,.exercise-set-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.exercise-set-actions{margin-top:9px}
+.exercise-set-actions>.btn{min-width:0;padding-inline:8px}
+.exercise-set-actions>.btn:only-child{grid-column:1/-1}
+.exercise-toolbar{margin-bottom:9px}
 .dialog-card{display:grid;gap:14px;padding:20px}
 dialog{color:var(--text);background:#1d1526;border:1px solid #553b6a;border-radius:17px;padding:0;max-width:min(480px,calc(100% - 26px));width:100%;max-height:84dvh}
 dialog::backdrop{background:#09070cc0;backdrop-filter:blur(4px)}
@@ -268,9 +273,10 @@ dialog.picker-compact{
 .training-main h1{overflow-wrap:anywhere}
 .btn.rename{flex:none;align-self:flex-start;font-size:12px;padding-inline:10px}
 .workout-clock{font-size:32px;font-weight:850;letter-spacing:.025em;font-variant-numeric:tabular-nums;line-height:1.25;color:#edd6ff}
-.rest-setting{display:flex;gap:6px;align-items:center;min-height:38px;padding:3px 9px;margin:0 0 9px;border:1px solid #503561;border-radius:8px;background:#281b34;color:#e0b7ff;font-size:12px;font-weight:750}
-.rest-setting:hover{background:#3a244c}
-.rest-setting svg{width:15px;height:15px}
+.rest-setting,.exercise-toolbar .journal-edit{display:flex;gap:6px;align-items:center;min-height:38px;padding:3px 9px;border:1px solid #503561;border-radius:8px;background:#281b34;color:#e0b7ff;font-size:12px;font-weight:750}
+.exercise-toolbar>button{min-width:0;justify-content:center;margin:0;text-align:center}
+.rest-setting:hover,.exercise-toolbar .journal-edit:hover{background:#3a244c}
+.rest-setting svg,.exercise-toolbar .journal-edit svg{width:15px;height:15px;flex:none}
 .rest-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .rest-presets .btn{padding-inline:10px;min-height:40px}
 .rest-dock{position:fixed;z-index:4;left:50%;bottom:calc(77px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(calc(100% - 26px),530px);overflow:hidden;border:1px solid #a966d4;border-radius:14px;background:radial-gradient(ellipse at 5% 0%,#532976,#22162d 75%);box-shadow:0 8px 30px #0c0713cf}
@@ -300,11 +306,13 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .dimensional-title em{font-style:normal}
 .dimensional-title,.brand>span:nth-child(2){font-weight:950}
 .exercise-title{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}
+.exercise-title-icons{display:flex;flex:none;gap:4px}
 .exercise-history-trigger{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0;border:0;background:none;text-align:left;font:inherit;line-height:1.25;overflow-wrap:anywhere}
 .exercise-history-trigger svg{width:16px;height:16px;color:var(--purple)}
 .exercise-history-trigger:hover{color:#edcaff;text-decoration:underline;text-underline-offset:3px}
 .technique-button{display:grid;place-items:center;flex:none;width:30px;height:30px;padding:0;border:1px solid #59386f;border-radius:50%;background:#302040;color:#e2b4ff;font-size:15px;font-weight:850}
 .technique-button:hover{background:#503263}
+.technique-button svg{width:16px;height:16px}
 .catalog-technique{display:grid;gap:10px;padding:13px;border:1px solid #513363;border-radius:12px;background:#231a2f;line-height:1.5}
 .catalog-technique p{font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
 .catalog-technique p.meta{font-size:12px}
@@ -320,8 +328,10 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .field textarea{font:inherit;font-size:16px;resize:vertical;color:var(--text);background:#140f1b;border:1px solid #4a3b57;border-radius:8px;padding:8px 10px;min-width:0}
 .journal-block{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}
 .journal-block .journal-edit{min-height:38px;padding:6px 9px;font-size:12px}
-.journal-block p{flex:0 0 100%;color:var(--muted);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
-.exercise .journal-block p,.session-hdr .journal-block p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.journal-block p,.exercise-journal-preview p{color:var(--muted);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.journal-block p{flex:0 0 100%}
+.exercise-journal-preview{display:grid;gap:4px;margin-bottom:9px}
+.exercise-journal-preview p,.session-hdr .journal-block p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .journal-partner,.journal-friend{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
 .journal-partner svg{width:16px;height:16px}
 .journal-friend{min-height:44px}

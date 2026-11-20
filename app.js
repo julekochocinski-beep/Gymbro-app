@@ -29,6 +29,7 @@ const icons={
   calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18m-13 5h.01m4 0h.01m4 0h.01"/>',
   check:'<path d="m5 12 4 4L19 6"/>',
   arrow:'<path d="M4 12h16m-6-6 6 6-6 6"/>',
+  swap:'<path d="M4 8h16m-4-4 4 4-4 4M20 16H4m4-4-4 4 4 4"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   x:'<path d="m6 6 12 12M18 6 6 18"/>',
   stopwatch:'<circle cx="12" cy="14" r="8"/><path d="M9 2h6m-3 4V2m0 8v4l3 2m3-9 2-2"/>',
@@ -576,8 +577,8 @@ function setRow(set,i,j,previous){
     '<button type="button" class="icon-btn del" data-act="remove-set"'+ref+' aria-label="'+t('Usuń serię')+' '+number+'">'+icon('x')+'</button></div></div>'+
     (previous?'<p class="meta previous-set">'+t('Poprzednio')+' <strong>'+setResult(previous)+'</strong></p>':'')+
     '<div class="set-card-fields"><label class="field">'+t('Ciężar (kg)')+
-    '<input type="text" inputmode="decimal" maxlength="8" placeholder="0" data-field="kg"'+ref+' value="'+esc(set.kg)+'" aria-label="'+t('Ciężar w kg, seria')+' '+number+'"></label>'+
-    '<label class="field">'+t('Powtórzenia')+'<input type="text" inputmode="numeric" maxlength="4" placeholder="10" data-field="reps"'+ref+
+    '<input type="text" inputmode="decimal" maxlength="8" placeholder="'+esc(previous?.kg??'')+'" data-field="kg"'+ref+' value="'+esc(set.kg)+'" aria-label="'+t('Ciężar w kg, seria')+' '+number+'"></label>'+
+    '<label class="field">'+t('Powtórzenia')+'<input type="text" inputmode="numeric" maxlength="4" placeholder="'+esc(previous?.reps??'')+'" data-field="reps"'+ref+
     ' value="'+esc(set.reps)+'" aria-label="'+t('Powtórzenia, seria')+' '+number+'"></label></div></div>';
 }
 function techniqueButton(label){
@@ -598,23 +599,30 @@ function repTarget(exercise){
 }
 function previousSetsByNumber(label){
   const previous=exerciseHistory(data.sessions,label)[0]?.sets??[];
-  return new Map(previous.map(set=>[set.number,set]));
+  const byNumber=new Map(previous.map(set=>[set.number,set]));
+  if(previous.length&&!byNumber.has(1)) byNumber.set(1,previous[0]);
+  return byNumber;
 }
 function exerciseCard(exercise,i,notes){
   const label=esc(exerciseLabel(exercise.label));
   const key=exerciseKey(exercise.label);
   const workoutId=data.draft.id;
   const previousByNumber=previousSetsByNumber(exercise.label);
+  const machine=hasMachineSettings(exercise.label);
+  const note=notes.exercises?.[key];
+  const settings=machine?readJournal('machine',key).note:null;
   return '<section class="card exercise"><div class="card-head"><div><div class="exercise-title"><h3>'+
     '<button type="button" class="exercise-history-trigger" data-act="exercise-history" data-ex="'+i+'" aria-haspopup="dialog" aria-label="'+label+' · '+t('Historia ćwiczenia')+'">'+
-    label+icon('calendar')+'</button></h3>'+techniqueButton(exercise.label)+'</div>'+
+    label+icon('calendar')+'</button></h3><div class="exercise-title-icons">'+techniqueButton(exercise.label)+
+    (machine?journalButton('machine',workoutId,i):'')+'</div></div>'+
     '<p class="meta">'+(weightsFor(exercise.label,data.custom)?t('Serii:')+' '+exercise.sets.filter(s=>s.done).length:t('Bez przypisanej partii mięśni'))+'</p></div>'+
-    '<button type="button" class="btn ghost" data-act="remove-exercise" data-ex="'+i+'" aria-label="'+t('Usuń ćwiczenie')+' '+esc(exerciseLabel(exercise.label))+'">'+icon('x')+'</button></div>'+restSetting(exercise,i,'workout')+repTarget(exercise)+
+    '<button type="button" class="btn ghost" data-act="remove-exercise" data-ex="'+i+'" aria-label="'+t('Usuń ćwiczenie')+' '+label+'">'+icon('x')+'</button></div>'+
+    '<div class="exercise-toolbar">'+restSetting(exercise,i,'workout')+journalButton('exercise',workoutId,i)+'</div>'+
+    ([note,settings].some(Boolean)?'<div class="exercise-journal-preview">'+[note,settings].filter(Boolean).map(text=>'<p>'+esc(text)+'</p>').join('')+'</div>':'')+
+    repTarget(exercise)+
     '<div class="set-list">'+exercise.sets.map((s,j)=>setRow(s,i,j,previousByNumber.get(j+1))).join('')+'</div>'+
-    '<div class="controls"><button type="button" class="btn ghost add-set" data-act="add-set" data-ex="'+i+'">'+icon('plus')+' '+t('Dodaj serię')+'</button>'+
-    (exercise.sets.some(set=>!set.done)?'<button type="button" class="btn ghost" data-act="replace-exercise" data-ex="'+i+'">'+t('Zamień na dziś')+'</button>':'')+'</div>'+
-    journalBlock('exercise',workoutId,notes.exercises?.[key],i)+
-    (hasMachineSettings(exercise.label)?journalBlock('machine',workoutId,readJournal('machine',key).note,i):'')+'</section>';
+    '<div class="exercise-set-actions"><button type="button" class="btn ghost" data-act="add-set" data-ex="'+i+'">'+icon('plus')+' '+t('Dodaj serię')+'</button>'+
+    (exercise.sets.some(set=>!set.done)?'<button type="button" class="btn ghost" data-act="replace-exercise" data-ex="'+i+'">'+icon('swap')+' '+t('Zamień na dziś')+'</button>':'')+'</div></section>';
 }
 function planRows(){
   if(!data.savedPlans.length) return '<p class="meta">'+t('Zapisz własną listę ćwiczeń, żeby uruchamiać ją na kolejnych treningach.')+'</p>';
@@ -1280,9 +1288,15 @@ function readJournal(kind,id){
   try{return JSON.parse(localStorage.getItem(journalKey(kind,id)))??{};}
   catch{return {};}
 }
+function journalButton(kind,id,index){
+  const machine=kind==='machine';
+  const title=t(journalTitles[kind]);
+  return '<button type="button" class="'+(machine?'technique-button':'btn ghost journal-edit')+'" data-act="workout-journal" data-key="'+esc(id)+
+    '" data-kind="'+kind+'"'+(index===undefined?'':' data-ex="'+index+'"')+' aria-haspopup="dialog"'+(machine?' aria-label="'+title+'" title="'+title+'"':'')+'>'+
+    (machine?icon('settings'):icon('edit')+' '+title)+'</button>';
+}
 function journalBlock(kind,id,note,index,withFriend=false){
-  return '<div class="journal-block"><button type="button" class="btn ghost journal-edit" data-act="workout-journal" data-key="'+esc(id)+
-    '" data-kind="'+kind+'"'+(index===undefined?'':' data-ex="'+index+'"')+' aria-haspopup="dialog">'+icon('edit')+' '+t(journalTitles[kind])+'</button>'+
+  return '<div class="journal-block">'+journalButton(kind,id,index)+
     (withFriend?'<span class="journal-partner">'+icon('clan')+' '+t('Trening ze znajomym')+'</span>':'')+
     (note?'<p>'+esc(note)+'</p>':'')+'</div>';
 }
