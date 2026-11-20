@@ -368,6 +368,15 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .home-buddy:hover{border-color:#b776dd}
 .buddy-figure{position:relative;isolation:isolate;width:min(78%,275px);pointer-events:none}
 .buddy-figure img{display:block;position:absolute;inset:0;width:100%;height:100%;user-select:none}
+.tattoo-ink{
+  background:#1a111e;
+  -webkit-mask:var(--tattoo-art) center/contain no-repeat;
+  mask:var(--tattoo-art) center/contain no-repeat
+}
+.tattoo-ink[data-ink="white"]{background:#f4eaf6}
+.buddy-tattoo{position:absolute;transform:translate(-50%,-50%) rotate(var(--tattoo-angle));opacity:.86}
+.tattoo-thumb{width:100%;height:100%}
+.outfit-thumb:has(.tattoo-thumb[data-ink="black"]){background:radial-gradient(circle at center,#987e9f,#725c7b 78%)}
 .buddy-figure .buddy-base{filter:var(--material-filter,brightness(1)) drop-shadow(0 7px 12px #0b0915b8)}
 .buddy-figure[data-skin="bronze"]{--material-filter:url(#material-bronze);--finish-light:#ffd5ab9e;--finish-reflection:#a8b3f33d}
 .buddy-figure[data-skin="silver"]{--material-filter:url(#material-silver);--finish-light:#f0fbffb3;--finish-reflection:#97bcff4d}
@@ -394,8 +403,11 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .streak-info svg{width:16px;height:16px;color:#cf9bff;flex:none}
 .streak-info span{margin-left:auto}
 .wardrobe-card{display:grid;gap:8px}
-.wardrobe-tabs .segmented{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
-.wardrobe-tabs .segmented button{min-width:0;min-height:40px;padding-inline:4px;overflow-wrap:anywhere}
+.wardrobe-tabs .segmented,.wardrobe-filters .segmented{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
+.wardrobe-tabs .segmented button,.wardrobe-filters .segmented button{min-width:0;min-height:40px;padding-inline:4px;overflow-wrap:anywhere}
+.tattoo-controls{display:flex;flex-wrap:wrap;gap:5px}
+.tattoo-controls .segmented{max-width:100%}
+.tattoo-controls button{min-height:36px;padding-inline:8px}
 .outfit-row{display:grid;align-items:center;grid-template-columns:65px minmax(0,1fr);gap:12px;padding:9px;border:1px solid #432d53;border-radius:11px;background:#211729}
 .outfit-thumb{display:grid;place-items:center;width:65px;height:63px;padding:7px;border:1px solid #573764;background:radial-gradient(circle at center,#4a2d58,#2b1d34 75%);border-radius:9px}
 .outfit-thumb img{max-width:100%;max-height:100%;object-fit:contain}

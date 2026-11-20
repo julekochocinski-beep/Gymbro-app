@@ -2,7 +2,8 @@ import { supabase } from './supabase.mjs';
 import {t,setLanguage,uiLocale} from './locale.mjs';
 import {lifts,liftResults,clanProfile,workoutRecord,workoutActivities,clanRequest,friendsRequest,profileRequest} from './clans.mjs';
 import {models,modelFor} from './models.mjs';
-import {items,wardrobeFrom,legacyProgress,progression,buyItem,toggleItem,XP_PER_DAY,XP_PER_RECORD,COINS_PER_LEVEL} from './gymbro.mjs';
+import {items,wardrobeFrom,legacyProgress,progression,buyItem,toggleItem,toggleTattoo,XP_PER_DAY,XP_PER_RECORD,COINS_PER_LEVEL} from './gymbro.mjs';
+import {placeTattoo,tattooAreas,tattooFits,tattooInks,tattooPlacements,tattooSlots} from './tattoos.mjs';
 import {plans,muscles,standard,example,normalize,weightsFor,completedCount,newDraft,blankSet,newId,previousBest,exerciseHistory,numberedCompletedSets,exerciseConfig,MAX_PLAN_SETS,MAX_PLAN_REPS,elapsedSeconds,remainingSeconds,timeLabel,statsFor,dayKey,weekKeys,recentSessions} from './training.mjs';
 
 import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,exerciseTechnique,matchesExercise} from './catalog.mjs';
@@ -79,6 +80,8 @@ let profilePhoto=null, photoWriting=false, draftPhotoPreview=null;
 let progressCacheKey, progressCache;
 
 let avatarSide='przod', wardrobeTab=data.wardrobe.owned.length?'garderoba':'sklep', tryOn=null;
+let wardrobeFilter='all', tattooArea='chest', tattooSlot='chest', tattooColor='black';
+const wardrobeFilters=[['all','Wszystko'],['clothes','Ubrania'],['accessories','Akcesoria'],['tattoos','Tatuaże']];
 const progressState={month:dayKey(Date.now()).slice(0,7),day:null,query:'',order:'newest'};
 const weekdays=['Pon','Wt','Śr','Czw','Pt','Sob','Nd'];
 let clanTime,formatKg,monthFormatter,fullDayFormatter,formatter;
@@ -283,16 +286,29 @@ function tenureText(months){
   if(!months) return t('Staż krótszy niż miesiąc');
   return tenureDuration(months)+' '+t('stażu');
 }
-function buddyModel(view,preview=null,shine=null,{worn=data.wardrobe.worn,skin=activeSkin(),model=activeModel()}={}){
+function tattooLayers(model,tattoos,preview){
+  const positions=tattooPlacements[model.id];
+  if(!positions) return '';
+  const marks=preview?.slot?placeTattoo(tattoos,preview.id,preview.slot,preview.color):tattoos;
+  return Object.entries(marks).map(([slot,mark])=>{
+    const [x,y,width,height,angle]=positions[slot];
+    return '<span class="buddy-tattoo tattoo-ink" data-ink="'+mark.color+'" data-placement="'+slot+'" aria-hidden="true" '+
+      'style="--tattoo-art:url(assets/tattoos/'+mark.id+'.webp);left:'+x+'%;top:'+y+'%;width:'+width+'%;height:'+height+'%;--tattoo-angle:'+angle+'deg"></span>';
+  }).join('');
+}
+function buddyModel(view,preview=null,shine=null,{worn=data.wardrobe.worn,tattoos=data.wardrobe.tattoos,skin=activeSkin(),model=activeModel()}={}){
   const [width,height]=model.layout[view].plotno;
   const description=t(model.name)+' · '+t(view==='przod'?'Przód':'Tył');
-  const visible=items.filter(item=>(worn.includes(item.id)||preview===item.id)&&(view==='przod'||item.back));
+  const trial=items.find(item=>item.id===preview?.id);
+  const visible=items.filter(item=>item.category!=='tattoos'&&(view==='przod'||item.back)&&
+    (trial===item||worn.includes(item.id)&&(!trial?.wearSlot||item.wearSlot!==trial.wearSlot)));
   const asset=model.root+'ubrania/'+view+'-';
   const glint=visible.some(item=>item.id===shine)?
     '<span class="outfit-glint" aria-hidden="true" style="--outfit-mask:url('+asset+shine+'.webp)"></span>':'';
   const base=asset+'baza.webp';
   const finish=skin==='default'?'':'<span class="buddy-finish" style="--buddy-art:url('+base+')" aria-hidden="true"></span>';
   return '<div class="buddy-figure" data-model="'+model.id+'" data-skin="'+esc(skin)+'" style="aspect-ratio:'+width+'/'+height+'"><img class="buddy-base" src="'+base+'" alt="'+description+'" draggable="false">'+finish+
+    (view==='przod'?tattooLayers(model,tattoos??{},preview):'')+
     visible.map(item=>'<img src="'+asset+item.id+'.webp" data-worn="'+item.id+'" alt="'+t(item.name)+'" draggable="false">').join('')+glint+'</div>';
 }
 function homeBuddy(){
@@ -306,7 +322,7 @@ function wardrobeItem(item,coins){
   const {owned,worn}=data.wardrobe;
   const fits=owned.includes(item.id);
   const wearing=worn.includes(item.id);
-  const trying=tryOn===item.id;
+  const trying=tryOn?.id===item.id;
   const attr=' type="button" data-key="'+item.id+'"';
   return '<article class="outfit-row"><div class="outfit-thumb"><img src="'+activeModel().root+'ubrania/produkt-'+item.id+'.webp" alt=""></div>'+
     '<div class="outfit-description"><h3>'+t(item.name)+'</h3><span class="meta">'+t(item.slot)+(wearing?' '+t('· Założone'):fits?' '+t('· Kupione'):'')+'</span>'+
@@ -314,6 +330,36 @@ function wardrobeItem(item,coins){
       '<button class="btn ghost" data-act="outfit-try"'+attr+' aria-pressed="'+trying+'" aria-label="'+t('Przymierz:')+' '+t(item.name)+'">'+(trying?t('Zakończ podgląd'):t('Przymierz'))+'</button>'+
       '<button class="btn primary" data-act="outfit-buy"'+attr+(coins<item.price?' disabled':'')+' aria-label="'+t('Kup:')+' '+t(item.name)+' '+t('za')+' '+item.price+' '+t('monet')+'">'+t('Kup')+' '+icon('coin')+' '+item.price+'</button>')+
     '</div></div></article>';
+}
+function tattooRow(item,coins){
+  const owned=data.wardrobe.owned.includes(item.id);
+  const tattoos=data.wardrobe.tattoos;
+  const current=Object.keys(tattoos).find(slot=>tattoos[slot].id===item.id);
+  const filtering=wardrobeFilter==='tattoos';
+  const slot=filtering?tattooSlot:current??tattooAreas.find(area=>item.areas.includes(area.id)).slots[0];
+  const color=filtering?tattooColor:tattoos[current]?.color??tattooColor;
+  const active=current===slot&&tattoos[slot]?.color===color;
+  const trying=tryOn?.id===item.id&&tryOn.slot===slot&&tryOn.color===color;
+  const attributes=' type="button" data-key="'+item.id+'" data-slot="'+slot+'" data-color="'+color+'"';
+  const equipLabel=active?'Zdejmij':current===slot?'Zmień kolor':current?'Przenieś':'Załóż';
+  const button=(act,label,style='ghost',extra='')=>'<button class="btn '+style+'" data-act="'+act+'"'+attributes+extra+'>'+label+'</button>';
+  return '<article class="outfit-row"><div class="outfit-thumb">'+
+    '<span class="tattoo-thumb tattoo-ink" data-ink="'+color+'" aria-hidden="true" style="--tattoo-art:url(assets/tattoos/'+item.id+'.webp)"></span></div>'+
+    '<div class="outfit-description"><h3>'+t(item.name)+'</h3><span class="meta">'+
+    (current?t(tattooSlots[current]):t('Tatuaż'))+'</span><div class="outfit-actions">'+
+    button('tattoo-try',t(trying?'Zakończ podgląd':'Przymierz'),'ghost',' aria-pressed="'+trying+'"')+
+    (owned?button('tattoo-equip',t(equipLabel)):button('outfit-buy',t('Kup')+' '+icon('coin')+' '+item.price,'primary',coins<item.price?' disabled':''))+'</div></div></article>';
+}
+function tattooControls(){
+  const area=tattooAreas.find(entry=>entry.id===tattooArea);
+  return '<div class="tattoo-controls">'+segment(t('Miejsce tatuażu'),tattooArea,tattooAreas.map(({id,name})=>[id,t(name)]),'tattoo-area')+
+    (area.slots.length>1?segment(t('Strona ciała'),tattooSlot,area.slots.map(slot=>[slot,t(tattooSlots[slot])]),'tattoo-slot'):'')+
+    segment(t('Kolor tatuażu'),tattooColor,tattooInks.map(([id,name])=>[id,t(name)]),'tattoo-color')+'</div>';
+}
+function updateTattooPreview(){
+  if(!tryOn?.slot) return;
+  const item=items.find(entry=>entry.id===tryOn.id);
+  tryOn=tattooFits(item,tattooSlot,tattooColor)?{id:tryOn.id,slot:tattooSlot,color:tattooColor}:null;
 }
 function skinRows(){
   const active=activeSkin();
@@ -345,13 +391,18 @@ function characterRows(){
 function wardrobeContent(coins){
   if(wardrobeTab==='postacie') return characterRows();
   if(wardrobeTab==='skorki') return skinRows();
-  const shown=wardrobeTab==='sklep'?items:items.filter(item=>data.wardrobe.owned.includes(item.id));
-  return shown.length?shown.map(item=>wardrobeItem(item,coins)).join(''):
-    '<p class="meta">'+t('Kupione ubranka pojawią się tutaj.')+'</p>'+action(t('Przejdź do sklepu'),'open-shop','ghost full','bag');
+  const shown=items.filter(item=>(wardrobeTab==='sklep'||data.wardrobe.owned.includes(item.id))&&
+    (wardrobeFilter==='all'||item.category===wardrobeFilter)&&
+    (wardrobeFilter!=='tattoos'||item.areas.includes(tattooArea)));
+  const filters='<div class="wardrobe-filters">'+segment(t('Kategoria'),wardrobeFilter,wardrobeFilters.map(([id,name])=>[id,t(name)]),'wardrobe-filter')+'</div>';
+  const rows=shown.length?shown.map(item=>item.category==='tattoos'?tattooRow(item,coins):wardrobeItem(item,coins)).join(''):
+    '<p class="meta">'+t('Brak przedmiotów w tej kategorii.')+'</p>'+
+    (wardrobeTab==='garderoba'?action(t('Przejdź do sklepu'),'open-shop','ghost full','bag'):'');
+  return filters+(wardrobeFilter==='tattoos'?tattooControls():'')+rows;
 }
 function showGymBro(shine){
   const player=currentProgress();
-  const preview=items.find(item=>item.id===tryOn);
+  const preview=items.find(item=>item.id===tryOn?.id);
   return heading(t('Twój')+' <em>GymBro</em>',t('Personalizuj postać i odblokowuj ubranka za monety.'))+
     '<div class="stack"><section class="card card-pad buddy-card"><div class="card-head">'+
     segment(t('Widok GymBro'),avatarSide,[['przod',t('Przód')],['tyl',t('Tył')]],'avatar-side')+coinBalance(player.coins)+'</div>'+
@@ -359,7 +410,7 @@ function showGymBro(shine){
     (preview?'<span class="buddy-preview-tag">'+t('Przymiarka ·')+' '+t(preview.name)+'</span>':'')+'</div>'+skinTestBadge()+xpBar(player)+streakInfo(player)+
     '<p class="meta xp-note">'+XP_PER_DAY+' '+t('XP za pierwszy zapisany trening dnia, z mnożnikiem do ×1,5 za tygodnie z rzędu. Pierwszy nowy rekord dnia daje dodatkowe')+' '+XP_PER_RECORD+' '+t('XP. Za każdy awans dostajesz')+' '+COINS_PER_LEVEL+' '+t('monet')+'.</p></section>'+
     '<section class="card card-pad wardrobe-card"><h2>'+t('Personalizacja')+'</h2>'+
-    '<div class="wardrobe-tabs">'+segment(t('Personalizacja'),wardrobeTab,[['garderoba',t('Garderoba')],['sklep',t('Ubranka')],
+    '<div class="wardrobe-tabs">'+segment(t('Personalizacja'),wardrobeTab,[['garderoba',t('Garderoba')],['sklep',t('Sklep')],
       ['skorki',t('Skórki')],['postacie',t('Postacie')]],'wardrobe-tab')+'</div>'+wardrobeContent(player.coins)+
     '</section></div>';
 }
@@ -592,16 +643,16 @@ function showTraining(){
 }
 
 function liftCards(results={}){
-  return '<section class="card card-pad lifts-panel"><h2>'+t('Rekordy siłowe')+'</h2><p class="meta">'+t('1RM • największy ciężar podniesiony na jedno powtórzenie.')+'</p>'+
+  return '<section class="card card-pad lifts-panel"><h2>'+t('Rekordy siłowe')+'</h2><p class="meta">'+t('1RM · Najcięższy zaliczony ciężar')+'</p>'+
     '<div class="lift-grid">'+lifts.map(lift=>{
       const result=results?.[lift.id];
       return '<div class="lift-tile"><h3>'+t(lift.display)+'</h3><strong>'+
-        (result?.reps===1?formatKg.format(result.kg)+' <small>kg</small>':'—')+'</strong></div>';
+        (Number.isFinite(result?.kg)?formatKg.format(result.kg)+' <small>kg</small>':'—')+'</strong></div>';
     }).join('')+'</div></section>';
 }
 function profileAvatar(person,own=false){
   if(own) return buddyModel('przod');
-  return buddyModel('przod',null,null,{worn:person.worn??[],skin:person.previewSkin??person.skin??'default',model:modelFor(person.model)});
+  return buddyModel('przod',null,null,{worn:person.worn??[],tattoos:person.tattoos??{},skin:person.previewSkin??person.skin??'default',model:modelFor(person.model)});
 }
 function clanLeaderBadge(id){
   return id===clanState.clan?.ownerId?'<span class="clan-leader-badge">'+t('Lider')+'</span>':'';
@@ -1707,7 +1758,7 @@ document.addEventListener('click',async event=>{
   if(data.draft?.rest?.deadline>Date.now()) armRestSound();
   const button=event.target.closest('[data-act]');
   if(!button) return;
-  const {act,key,ex,set:idx}=button.dataset;
+  const {act,key,ex,set:idx,slot,color}=button.dataset;
   const exercise=data.draft?.exercises[Number(ex)];
   const set=exercise?.sets[Number(idx)];
   switch(act){
@@ -1819,18 +1870,42 @@ document.addEventListener('click',async event=>{
       wardrobeTab=key;tryOn=null;render();
       app.querySelector('[data-act="wardrobe-tab"][aria-pressed="true"]')?.focus({preventScroll:true});
       break;
+    case 'wardrobe-filter':
+      wardrobeFilter=key;tryOn=null;render();
+      app.querySelector('[data-act="wardrobe-filter"][aria-pressed="true"]')?.focus({preventScroll:true});
+      break;
+    case 'tattoo-area':
+      tattooArea=key;tattooSlot=tattooAreas.find(area=>area.id===key).slots[0];updateTattooPreview();render();
+      break;
+    case 'tattoo-slot':
+      tattooSlot=key;updateTattooPreview();render();break;
+    case 'tattoo-color':
+      tattooColor=key;updateTattooPreview();render();break;
     case 'open-shop':wardrobeTab='sklep';render();break;
     case 'outfit-try':
-      tryOn=tryOn===key?null:key;
+      tryOn=tryOn?.id===key?null:{id:key};
       if(tryOn&&items.find(item=>item.id===key)?.back===false) avatarSide='przod';
-      render({shine:tryOn});break;
+      render({shine:tryOn?.id});break;
+    case 'tattoo-try':
+      if(tattooFits(items.find(item=>item.id===key),slot,color)){
+        tryOn=tryOn?.id===key&&tryOn.slot===slot&&tryOn.color===color?null:{id:key,slot,color};
+        if(tryOn) avatarSide='przod';
+        render();
+      }
+      break;
+    case 'tattoo-equip':
+      if(toggleTattoo(data.wardrobe,key,slot,color)){
+        tryOn=null;avatarSide='przod';
+        rememberAppearance();render();syncSocialProfiles();
+      }
+      break;
     case 'outfit-buy':
-      if(buyItem(data.wardrobe,key,currentProgress().coins)){
+      if(buyItem(data.wardrobe,key,currentProgress().coins,slot,color)){
         tryOn=null;
-        if(items.find(item=>item.id===key)?.back===false) avatarSide='przod';
+        if(slot||items.find(item=>item.id===key)?.back===false) avatarSide='przod';
         rememberAppearance();render({shine:key});
         syncSocialProfiles();
-        if(storageOK) toast(t('Ubranko kupione i założone'));
+        if(storageOK) toast(t(slot?'Tatuaż kupiony i założony':'Ubranko kupione i założone'));
       }
       break;
     case 'outfit-toggle':

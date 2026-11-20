@@ -3,6 +3,7 @@ import { t } from './locale.mjs';
 import { exerciseKey, exerciseLabel } from './catalog.mjs';
 import { unlockedSkin } from './skins.mjs';
 import { modelFor } from './models.mjs';
+import { tattoosFrom } from './tattoos.mjs';
 import { beatenRecords, completedBest, completedCount, dayKey, weekKeys } from './training.mjs';
 
 export const lifts = [
@@ -13,7 +14,7 @@ export const lifts = [
 export const clanPrLabels = new Set(lifts.map(({ label }) => exerciseLabel(label)));
 
 export function liftResults(sessions) {
-  const best = completedBest(sessions, { onlyReps: 1 });
+  const best = completedBest(sessions);
   return Object.fromEntries(lifts.map(({ id, label }) => {
     const entry = best.get(exerciseKey(label));
     return [id, entry ? { kg: entry.kg, reps: entry.reps } : null];
@@ -71,6 +72,7 @@ function mapMember(p) {
     nick: p.username,
     level: p.level ?? 1,
     worn: p.worn ?? [],
+    tattoos: tattoosFrom(p.app_data?.wardrobe?.tattoos),
     skin: p.equipped_skin ?? 'default',
     model: modelFor(p.app_data?.wardrobe?.model).id,
     previewSkin: p.preview_skin ?? null,

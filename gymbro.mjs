@@ -1,5 +1,6 @@
 import {addDays,beatenRecords,completedBest,completedCount,dayKey,weekStart} from './training.mjs';
 import {modelFor} from './models.mjs';
+import {placeTattoo,tattooFits,tattooItems,tattoosFrom} from './tattoos.mjs';
 
 export const XP_PER_DAY=50;
 export const XP_PER_RECORD=10;
@@ -9,14 +10,30 @@ const workoutXp=streak=>XP_PER_DAY+(streak>=2?5*Math.min(5,streak):0);
 
 // Layer order follows the supplied clothing assets.
 export const items=[
-  {id:'bandana',name:'Czerwona bandana',slot:'Na ramię',price:30,back:true},
-  {id:'lancuch',name:'Złoty łańcuch',slot:'Na szyję',price:50,back:true},
-  {id:'okulary',name:'Fioletowe okulary',slot:'Na twarz',price:40,back:false},
+  {id:'tank-white',name:'Biały tank top',slot:'Na tułów',wearSlot:'torso',category:'clothes',price:45,back:true},
+  {id:'tank-black',name:'Czarny tank top',slot:'Na tułów',wearSlot:'torso',category:'clothes',price:45,back:true},
+  {id:'bandana',name:'Czerwona bandana',slot:'Na ramię',category:'accessories',price:30,back:true},
+  {id:'lancuch',name:'Złoty łańcuch',slot:'Na szyję',category:'accessories',price:50,back:true},
+  {id:'okulary',name:'Fioletowe okulary',slot:'Na twarz',category:'accessories',price:40,back:false},
+  ...tattooItems,
 ];
 
 export function wardrobeFrom(stored){
   const owned=items.filter(item=>stored?.owned?.includes(item.id)).map(item=>item.id);
-  return {owned,worn:owned.filter(id=>stored?.worn?.includes(id)),skin:stored?.skin??'default',model:modelFor(stored?.model).id};
+  const worn=[];
+  for(const id of owned){
+    const item=items.find(entry=>entry.id===id);
+    if(item.category!=='tattoos'&&stored?.worn?.includes(id)) equipItem(worn,item);
+  }
+  return {owned,worn,tattoos:tattoosFrom(stored?.tattoos,owned),skin:stored?.skin??'default',model:modelFor(stored?.model).id};
+}
+
+function equipItem(worn,item){
+  if(item.wearSlot){
+    const current=worn.findIndex(id=>items.find(entry=>entry.id===id)?.wearSlot===item.wearSlot);
+    if(current>=0) worn.splice(current,1);
+  }
+  worn.push(item.id);
 }
 
 function savedWorkouts(sessions){
@@ -70,16 +87,32 @@ export function progression(sessions,wardrobe,legacy,now=Date.now()){
   return {xp,level,inLevel,target:levelTarget(level),coins:Math.max(0,earned-spent),streak:activeStreak,nextWorkoutXp};
 }
 
-export function buyItem(wardrobe,id,coins){
+export function buyItem(wardrobe,id,coins,slot,color){
   const item=items.find(entry=>entry.id===id);
   if(!item||wardrobe.owned.includes(id)||coins<item.price) return false;
+  if(item.category==='tattoos'&&!tattooFits(item,slot,color)) return false;
   wardrobe.owned.push(id);
-  wardrobe.worn.push(id);
+  if(item.category==='tattoos') wardrobe.tattoos=placeTattoo(wardrobe.tattoos??{},id,slot,color);
+  else equipItem(wardrobe.worn,item);
   return true;
 }
 
 export function toggleItem(wardrobe,id){
-  if(!wardrobe.owned.includes(id)) return false;
-  wardrobe.worn=wardrobe.worn.includes(id)?wardrobe.worn.filter(worn=>worn!==id):[...wardrobe.worn,id];
+  const item=items.find(entry=>entry.id===id);
+  if(!item||item.category==='tattoos'||!wardrobe.owned.includes(id)) return false;
+  if(wardrobe.worn.includes(id)) wardrobe.worn=wardrobe.worn.filter(worn=>worn!==id);
+  else equipItem(wardrobe.worn,item);
+  return true;
+}
+
+export function toggleTattoo(wardrobe,id,slot,color){
+  const item=tattooItems.find(entry=>entry.id===id);
+  if(!wardrobe.owned.includes(id)||!tattooFits(item,slot,color)) return false;
+  const tattoos=wardrobe.tattoos??{};
+  const current=tattoos[slot];
+  if(current?.id===id&&current.color===color){
+    delete tattoos[slot];
+    wardrobe.tattoos=tattoos;
+  }else wardrobe.tattoos=placeTattoo(tattoos,id,slot,color);
   return true;
 }
