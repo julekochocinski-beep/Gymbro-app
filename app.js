@@ -296,6 +296,9 @@ function tattooLayers(model,tattoos,preview){
       'style="--tattoo-art:url(assets/tattoos/'+mark.id+'.webp);left:'+x+'%;top:'+y+'%;width:'+width+'%;height:'+height+'%;--tattoo-angle:'+angle+'deg"></span>';
   }).join('');
 }
+function fitTankLayer(id,layer){
+  return id.startsWith('tank-')?'<span class="tank-fit-frame"><span class="tank-fit">'+layer+'</span></span>':layer;
+}
 function buddyModel(view,preview=null,shine=null,{worn=data.wardrobe.worn,tattoos=data.wardrobe.tattoos,skin=activeSkin(),model=activeModel()}={}){
   const [width,height]=model.layout[view].plotno;
   const description=t(model.name)+' · '+t(view==='przod'?'Przód':'Tył');
@@ -304,12 +307,12 @@ function buddyModel(view,preview=null,shine=null,{worn=data.wardrobe.worn,tattoo
     (trial===item||worn.includes(item.id)&&(!trial?.wearSlot||item.wearSlot!==trial.wearSlot)));
   const asset=model.root+'ubrania/'+view+'-';
   const glint=visible.some(item=>item.id===shine)?
-    '<span class="outfit-glint" aria-hidden="true" style="--outfit-mask:url('+asset+shine+'.webp)"></span>':'';
+    fitTankLayer(shine,'<span class="outfit-glint" aria-hidden="true" style="--outfit-mask:url('+asset+shine+'.webp)"></span>'):'';
   const base=asset+'baza.webp';
   const finish=skin==='default'?'':'<span class="buddy-finish" style="--buddy-art:url('+base+')" aria-hidden="true"></span>';
-  return '<div class="buddy-figure" data-model="'+model.id+'" data-skin="'+esc(skin)+'" style="aspect-ratio:'+width+'/'+height+'"><img class="buddy-base" src="'+base+'" alt="'+description+'" draggable="false">'+finish+
+  return '<div class="buddy-figure" data-model="'+model.id+'" data-skin="'+esc(skin)+'" style="aspect-ratio:'+width+'/'+height+';--tank-fit:url('+asset+'tank-fit.svg)"><img class="buddy-base" src="'+base+'" alt="'+description+'" draggable="false">'+finish+
     (view==='przod'?tattooLayers(model,tattoos??{},preview):'')+
-    visible.map(item=>'<img src="'+asset+item.id+'.webp" data-worn="'+item.id+'" alt="'+t(item.name)+'" draggable="false">').join('')+glint+'</div>';
+    visible.map(item=>fitTankLayer(item.id,'<img src="'+asset+item.id+'.webp" data-worn="'+item.id+'" alt="'+t(item.name)+'" draggable="false">')).join('')+glint+'</div>';
 }
 function homeBuddy(){
   const player=currentProgress();
