@@ -368,6 +368,7 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .home-buddy:hover{border-color:#b776dd}
 .buddy-figure{position:relative;isolation:isolate;width:min(78%,275px);pointer-events:none}
 .buddy-figure img{display:block;position:absolute;inset:0;width:100%;height:100%;user-select:none}
+.buddy-figure img[data-worn^="tank-"]{filter:drop-shadow(0 1px 1px #100a1a70)}
 .tattoo-ink{
   background:#1a111e;
   -webkit-mask:var(--tattoo-art) center/contain no-repeat;
