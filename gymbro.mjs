@@ -1,4 +1,5 @@
 import {addDays,beatenRecords,completedBest,completedCount,dayKey,weekStart} from './training.mjs';
+import {modelFor} from './models.mjs';
 
 export const XP_PER_DAY=50;
 export const XP_PER_RECORD=10;
@@ -15,7 +16,7 @@ export const items=[
 
 export function wardrobeFrom(stored){
   const owned=items.filter(item=>stored?.owned?.includes(item.id)).map(item=>item.id);
-  return {owned,worn:owned.filter(id=>stored?.worn?.includes(id)),skin:stored?.skin??'default'};
+  return {owned,worn:owned.filter(id=>stored?.worn?.includes(id)),skin:stored?.skin??'default',model:modelFor(stored?.model).id};
 }
 
 function savedWorkouts(sessions){

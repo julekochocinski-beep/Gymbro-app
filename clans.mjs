@@ -2,6 +2,7 @@ import { supabase } from './supabase.mjs';
 import { t } from './locale.mjs';
 import { exerciseKey, exerciseLabel } from './catalog.mjs';
 import { unlockedSkin } from './skins.mjs';
+import { modelFor } from './models.mjs';
 import { beatenRecords, completedBest, completedCount, dayKey, weekKeys } from './training.mjs';
 
 export const lifts = [
@@ -71,6 +72,7 @@ function mapMember(p) {
     level: p.level ?? 1,
     worn: p.worn ?? [],
     skin: p.equipped_skin ?? 'default',
+    model: modelFor(p.app_data?.wardrobe?.model).id,
     previewSkin: p.preview_skin ?? null,
     week: p.week_key ?? '',
     workouts: p.week_workouts ?? 0,
