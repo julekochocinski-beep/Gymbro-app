@@ -39,7 +39,6 @@ svg{width:20px;height:20px;flex:none;vertical-align:middle}
 .ranked[data-rank="gold"]{--rank-accent:#ffd773;--rank-shadow:#765220;--rank-light:#fff6d4}
 .ranked[data-rank="diamond"]{--rank-accent:#a4f5ff;--rank-shadow:#45509b;--rank-light:#edf8ff}
 .material-defs{position:absolute;width:0;height:0;overflow:hidden}
-.wardrobe-head{flex-wrap:wrap}
 .skin-test-controls{display:grid;gap:8px;margin-bottom:12px}
 .skin-test-controls .btn{justify-self:start}
 .skin-test-badge{margin:10px 0;color:#b8f1ff;background:#172331;border:1px solid #32516a;border-radius:8px;padding:7px 10px;font-size:.8rem;font-weight:750;width:max-content;max-width:100%}
@@ -395,11 +394,13 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .streak-info svg{width:16px;height:16px;color:#cf9bff;flex:none}
 .streak-info span{margin-left:auto}
 .wardrobe-card{display:grid;gap:8px}
-.wardrobe-card .card-head{margin:0 0 3px}
-.wardrobe-head .segmented{max-width:100%;flex-wrap:wrap}
+.wardrobe-tabs .segmented{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
+.wardrobe-tabs .segmented button{min-width:0;min-height:40px;padding-inline:4px;overflow-wrap:anywhere}
 .outfit-row{display:grid;align-items:center;grid-template-columns:65px minmax(0,1fr);gap:12px;padding:9px;border:1px solid #432d53;border-radius:11px;background:#211729}
 .outfit-thumb{display:grid;place-items:center;width:65px;height:63px;padding:7px;border:1px solid #573764;background:radial-gradient(circle at center,#4a2d58,#2b1d34 75%);border-radius:9px}
 .outfit-thumb img{max-width:100%;max-height:100%;object-fit:contain}
+.character-row{grid-template-columns:65px minmax(0,1fr) auto;text-align:left}
+.character-row[aria-pressed="true"]{border-color:#a76fde;background:#2d1d3a}
 .outfit-description h3{font-size:15px}
 .outfit-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
 .outfit-actions .btn{min-height:34px;padding:5px 8px;font-size:12px}

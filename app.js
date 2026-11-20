@@ -333,21 +333,34 @@ function skinRows(){
       '<span class="skin-state">'+(selected?icon('check')+' '+t('Aktywna'):locked?t('Zablokowana'):t('Wybierz'))+'</span></button>';
   }).join('')+'</div>';
 }
+function characterRows(){
+  const selectedModel=activeModel().id;
+  return models.map(model=>{
+    const selected=model.id===selectedModel;
+    return '<button type="button" class="outfit-row character-row" data-act="select-model" data-key="'+model.id+'" aria-pressed="'+selected+'">'+
+      '<span class="outfit-thumb"><img src="'+model.root+'ubrania/przod-baza.webp" alt="" loading="lazy"></span>'+
+      '<strong>'+t(model.name)+'</strong><span class="skin-state">'+(selected?icon('check')+' '+t('Aktywna'):t('Wybierz'))+'</span></button>';
+  }).join('');
+}
+function wardrobeContent(coins){
+  if(wardrobeTab==='postacie') return characterRows();
+  if(wardrobeTab==='skorki') return skinRows();
+  const shown=wardrobeTab==='sklep'?items:items.filter(item=>data.wardrobe.owned.includes(item.id));
+  return shown.length?shown.map(item=>wardrobeItem(item,coins)).join(''):
+    '<p class="meta">'+t('Kupione ubranka pojawią się tutaj.')+'</p>'+action(t('Przejdź do sklepu'),'open-shop','ghost full','bag');
+}
 function showGymBro(shine){
   const player=currentProgress();
   const preview=items.find(item=>item.id===tryOn);
-  const shown=wardrobeTab==='sklep'?items:items.filter(item=>data.wardrobe.owned.includes(item.id));
   return heading(t('Twój')+' <em>GymBro</em>',t('Personalizuj postać i odblokowuj ubranka za monety.'))+
     '<div class="stack"><section class="card card-pad buddy-card"><div class="card-head">'+
     segment(t('Widok GymBro'),avatarSide,[['przod',t('Przód')],['tyl',t('Tył')]],'avatar-side')+coinBalance(player.coins)+'</div>'+
-    segment(t('Postać GymBro'),activeModel().id,models.map(({id,name})=>[id,t(name)]),'select-model')+
     '<div class="buddy-stage" style="'+modelMotionStyle()+'">'+buddyModel(avatarSide,tryOn,shine)+
     (preview?'<span class="buddy-preview-tag">'+t('Przymiarka ·')+' '+t(preview.name)+'</span>':'')+'</div>'+skinTestBadge()+xpBar(player)+streakInfo(player)+
     '<p class="meta xp-note">'+XP_PER_DAY+' '+t('XP za pierwszy zapisany trening dnia, z mnożnikiem do ×1,5 za tygodnie z rzędu. Pierwszy nowy rekord dnia daje dodatkowe')+' '+XP_PER_RECORD+' '+t('XP. Za każdy awans dostajesz')+' '+COINS_PER_LEVEL+' '+t('monet')+'.</p></section>'+
-    '<section class="card card-pad wardrobe-card"><div class="card-head wardrobe-head"><h2>'+ (wardrobeTab==='garderoba'?t('Garderoba'):t('Sklep'))+'</h2>'+
-    segment(t('Personalizacja'),wardrobeTab,[['garderoba',t('Garderoba')],['sklep',t('Ubranka')],['skorki',t('Skórki')]],'wardrobe-tab')+'</div>'+
-    (wardrobeTab==='skorki'?skinRows():shown.length?shown.map(item=>wardrobeItem(item,player.coins)).join(''):
-      '<p class="meta">'+t('Kupione ubranka pojawią się tutaj.')+'</p>'+action(t('Przejdź do sklepu'),'open-shop','ghost full','bag'))+
+    '<section class="card card-pad wardrobe-card"><h2>'+t('Personalizacja')+'</h2>'+
+    '<div class="wardrobe-tabs">'+segment(t('Personalizacja'),wardrobeTab,[['garderoba',t('Garderoba')],['sklep',t('Ubranka')],
+      ['skorki',t('Skórki')],['postacie',t('Postacie')]],'wardrobe-tab')+'</div>'+wardrobeContent(player.coins)+
     '</section></div>';
 }
 const measurementFields=[
@@ -1803,7 +1816,9 @@ document.addEventListener('click',async event=>{
       break;
     }
     case 'wardrobe-tab':
-      wardrobeTab=key;tryOn=null;render();break;
+      wardrobeTab=key;tryOn=null;render();
+      app.querySelector('[data-act="wardrobe-tab"][aria-pressed="true"]')?.focus({preventScroll:true});
+      break;
     case 'open-shop':wardrobeTab='sklep';render();break;
     case 'outfit-try':
       tryOn=tryOn===key?null:key;
