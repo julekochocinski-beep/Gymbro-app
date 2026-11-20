@@ -499,6 +499,8 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 @media(max-width:360px){.lift-grid{grid-template-columns:1fr}.lift-tile{grid-template-columns:minmax(0,1fr) auto;align-items:center}}
 .lift-tile strong{color:#f4d5ff;font-size:24px}
 .lift-tile small{font-size:.56em}
+.one-rep-max-result{display:block;padding:12px;border:1px solid #513461;border-radius:10px;background:#2a1c38;color:#f4d5ff;font-weight:800}
+.one-rep-max-result:empty{display:none}
 .clan-invite{display:flex;align-items:center;justify-content:space-between;gap:10px;background:radial-gradient(ellipse at 8% 0%,#422655,#191420 72%)}
 .clan-invite strong{display:block;margin-top:3px;letter-spacing:.17em;color:#e7b0ff}
 .clan-code{text-transform:uppercase}

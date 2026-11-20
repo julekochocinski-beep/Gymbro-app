@@ -1,5 +1,15 @@
 import {addDays,dayKey,normalize} from './training.mjs';
 
+export function estimateOneRepMax(series){
+  const match=series.trim().match(/^(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+)$/i);
+  if(!match) return null;
+  const weight=Number(match[1].replace(',','.'));
+  const reps=Number(match[2]);
+  if(!Number.isFinite(weight)||weight<=0||!Number.isSafeInteger(reps)||reps<1) return null;
+  const estimate=reps===1?weight:weight*(1+reps/30);
+  return Number.isFinite(estimate)?estimate:null;
+}
+
 export function moveMonth(month,offset){
   const date=new Date(month+'-01T12:00:00Z');
   date.setUTCMonth(date.getUTCMonth()+offset);

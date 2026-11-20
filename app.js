@@ -7,7 +7,7 @@ import {placeTattoo,tattooAreas,tattooFits,tattooFrame,tattooInks,tattooSlots} f
 import {plans,muscles,standard,example,normalize,weightsFor,completedCount,newDraft,blankSet,newId,previousBest,exerciseHistory,numberedCompletedSets,exerciseConfig,MAX_PLAN_SETS,MAX_PLAN_REPS,elapsedSeconds,remainingSeconds,timeLabel,statsFor,dayKey,weekKeys,recentSessions} from './training.mjs';
 
 import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,exerciseTechnique,matchesExercise} from './catalog.mjs';
-import {filterSessions,monthGrid,moveMonth} from './progress.mjs';
+import {estimateOneRepMax,filterSessions,monthGrid,moveMonth} from './progress.mjs';
 import {previewFrames} from './exercise-preview.mjs';
 import {armRestSound,playRestSignal} from './rest-signal.mjs';
 import {createRestPush} from './rest-push.mjs';
@@ -94,7 +94,7 @@ function updateLocale(){
   document.querySelector('.nav').setAttribute('aria-label',t('Nawigacja'));
   restDock.setAttribute('aria-label',t('Timer przerwy'));
   clanTime=new Intl.DateTimeFormat(lang,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Warsaw'});
-  formatKg=new Intl.DateTimeFormat(lang,{maximumFractionDigits:8});
+  formatKg=new Intl.NumberFormat(lang,{maximumFractionDigits:8});
   monthFormatter=new Intl.DateTimeFormat(lang,{month:'long',year:'numeric',timeZone:'UTC'});
   fullDayFormatter=new Intl.DateTimeFormat(lang,{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
   formatter=new Intl.DateTimeFormat(lang,{day:'numeric',month:'long',timeZone:'Europe/Warsaw'});
@@ -545,7 +545,7 @@ function progressResults(){
 }
 function showProgress(){
   return heading('Progress',t('Zobacz dni treningowe i wróć do zapisanych sesji.'))+
-    '<div class="stack">'+liftCards(liftResults(data.sessions))+progressCalendar()+
+    '<div class="stack">'+liftCards(liftResults(data.sessions))+action(t('Kalkulator 1RM'),'one-rep-max','ghost full','dumbbell')+progressCalendar()+
     '<section class="card card-pad progress-history"><h2>'+(progressState.day?fullDayFormatter.format(dateForKey(progressState.day)):t('Ostatnie treningi'))+'</h2>'+
     (progressState.day?action(t('Pokaż wszystkie dni'),'calendar-clear','ghost'):'')+
     '<div class="progress-filters"><label class="field">'+t('Nazwa treningu')+'<input id="progress-query" type="search" placeholder="'+t('np. Push A')+'" value="'+esc(progressState.query)+'"></label>'+
@@ -654,12 +654,23 @@ function showTraining(){
 }
 
 function liftCards(results={}){
-  return '<section class="card card-pad lifts-panel"><h2>'+t('Rekordy siłowe')+'</h2><p class="meta">'+t('1RM · Najcięższy zaliczony ciężar')+'</p>'+
+  return '<section class="card card-pad lifts-panel"><h2>'+t('Rekordy siłowe')+'</h2><p class="meta">'+t('Największy ciężar z ukończonej serii.')+'</p>'+
     '<div class="lift-grid">'+lifts.map(lift=>{
       const result=results?.[lift.id];
       return '<div class="lift-tile"><h3>'+t(lift.display)+'</h3><strong>'+
         (Number.isFinite(result?.kg)?formatKg.format(result.kg)+' <small>kg</small>':'—')+'</strong></div>';
     }).join('')+'</div></section>';
+}
+function openOneRepMax(){
+  openModal(t('Kalkulator 1RM'),'<form id="one-rep-max-form" class="stack">'+
+    '<p class="meta">'+t('Wpisz ciężar w kg i liczbę powtórzeń z jednej serii.')+'</p>'+
+    '<label class="field">'+t('Ćwiczenie')+'<select name="lift">'+
+    lifts.map(lift=>'<option value="'+lift.id+'">'+t(lift.display)+'</option>').join('')+'</select></label>'+
+    '<label class="field">'+t('Ciężar × powtórzenia')+
+    '<input name="series" type="text" placeholder="100 × 3" maxlength="24" autocomplete="off" spellcheck="false" required></label>'+
+    '<button type="submit" class="btn primary full">'+t('Oblicz 1RM')+'</button>'+
+    '<output class="one-rep-max-result" aria-live="polite" aria-atomic="true"></output>'+
+    '<p class="meta">'+t('Wzór Epleya. Wynik jest szacunkiem i nie zapisuje się w rekordach.')+'</p></form>');
 }
 function profileAvatar(person,own=false){
   if(own) return buddyModel('przod');
@@ -1637,6 +1648,11 @@ function finish(){
 }
 
 document.addEventListener('input',event=>{
+  if(event.target.form?.id==='one-rep-max-form'){
+    if(event.target.name==='series') event.target.setCustomValidity('');
+    event.target.form.querySelector('output').textContent='';
+    return;
+  }
   if(event.target.id==='progress-query'){
     progressState.query=event.target.value;
     app.querySelector('#progress-results').innerHTML=progressResults();
@@ -1701,6 +1717,18 @@ document.addEventListener('submit',async event=>{
   event.preventDefault();
   const form=event.target;
   const fields=new FormData(form);
+  if(form.id==='one-rep-max-form'){
+    const input=form.elements.series;
+    const estimate=estimateOneRepMax(input.value);
+    if(estimate===null){
+      input.setCustomValidity(t('Wpisz serię w formacie 100 × 3.'));
+      input.reportValidity();
+      return;
+    }
+    const selected=form.elements.lift.selectedOptions[0].textContent;
+    form.querySelector('output').textContent=t('Szacowane 1RM')+' · '+formatKg.format(Number(estimate.toFixed(1)))+' kg · '+selected;
+    return;
+  }
   if(form.id==='auth-form'){
     const email=fields.get('email').trim();
     const password=fields.get('password');
@@ -1773,6 +1801,7 @@ document.addEventListener('click',async event=>{
   const exercise=data.draft?.exercises[Number(ex)];
   const set=exercise?.sets[Number(idx)];
   switch(act){
+    case 'one-rep-max':openOneRepMax();break;
     case 'auth-logout':
       if(restPush.status(currentUser?.id).busy) break;
       await restPush.disable(currentUser?.id);
