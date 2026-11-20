@@ -120,7 +120,8 @@ async function buildClanSnapshot(userId) {
   const [{ data: clan }, { data: members }, { data: msgs }] = await Promise.all([
     supabase.from('clans').select('*').eq('id', me.clan_id).maybeSingle(),
     supabase.from('profiles').select('*').eq('clan_id', me.clan_id),
-    supabase.from('clan_messages').select('*').eq('clan_id', me.clan_id).order('created_at', { ascending: true }).limit(80),
+    supabase.from('clan_messages').select('*').eq('clan_id', me.clan_id).order('created_at', { ascending: false })
+      .order('id', { ascending: false }).limit(80),
   ]);
 
   if (!clan) return { self: userId, week, clan: null, members: [], messages: [] };
@@ -130,7 +131,7 @@ async function buildClanSnapshot(userId) {
     week,
     clan: { id: clan.id, name: clan.name, tag: clan.tag, code: clan.code, ownerId: clan.owner_id },
     members: (members ?? []).map(mapMember),
-    messages: (msgs ?? []).map((m, idx) => ({
+    messages: (msgs ?? []).reverse().map((m, idx) => ({
       seq: idx + 1,
       id: m.id,
       sender: m.user_id,

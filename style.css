@@ -407,6 +407,26 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .style-slots article{display:grid;gap:6px}
 .share-card-preview{display:block;width:100%;max-height:min(56dvh,520px);object-fit:contain;border-radius:10px}
 .plan-sharing{margin-top:12px}
+.challenge-card{display:grid;gap:10px;background:radial-gradient(ellipse at 2% 0%,#3e2850,#19131f 75%)}
+.challenge-card h2{font-size:17px}
+.challenge-card .card-head{margin-bottom:0}
+.challenge-status{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#ecd5ff;font-size:13px}
+.challenge-status span{display:flex;align-items:center;gap:4px;color:#edc783}
+.challenge-status svg,.golem-icon svg,.trophy-emblem svg{width:19px;height:19px}
+.challenge-card progress{width:100%;height:7px;display:block;overflow:hidden;border-radius:99px;border:0;appearance:none;background:#392648}
+.challenge-card progress::-webkit-progress-bar{background:#392648}
+.challenge-card progress::-webkit-progress-value{background:linear-gradient(90deg,#8d52c2,#e0a9ff);border-radius:99px}
+.challenge-card progress::-moz-progress-bar{background:#c984ff;border-radius:99px}
+.golem-icon,.trophy-emblem{display:grid;place-items:center;flex:none;width:36px;height:36px;border:1px solid #82548e;border-radius:10px;background:#422951;color:#e9b6ff}
+.golem-armor{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.armor-zone{display:grid;gap:5px;min-width:0;padding:6px;border:1px solid #573667;border-radius:8px;background:#21162a;font-size:12px}
+.armor-zone span{overflow-wrap:anywhere}
+.armor-zone strong{color:#e8c1ff;font-variant-numeric:tabular-nums}
+.armor-zone.cracked{border-color:#ca8752;background:#423124}
+.armor-zone.cracked strong,.golem-event .clan-activity-text{color:#f7cb86}
+.trophy-card{display:flex;align-items:center}
+.trophy-emblem{border-color:#8c623b;background:#46331f;color:#ffd998}
+.clan-muscle-members{display:grid;gap:6px;padding-left:20px;margin:0}
 .home-buddy:hover{border-color:#b776dd}
 .buddy-figure{position:relative;isolation:isolate;width:min(78%,275px);pointer-events:none}
 .buddy-figure img{display:block;position:absolute;inset:0;width:100%;height:100%;user-select:none}

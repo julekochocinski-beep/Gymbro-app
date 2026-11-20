@@ -64,7 +64,7 @@ export function legacyProgress(sessions){
   };
 }
 
-export function progression(sessions,wardrobe,legacy,now=Date.now()){
+export function progression(sessions,wardrobe,legacy,now=Date.now(),bonusCoins=0){
   const days=new Set(), bonusDays=new Set(), best=new Map();
   let lastWeek=null, streak=0, xp=0;
   for(const session of savedWorkouts(sessions).sort((a,b)=>a.finished-b.finished)){
@@ -97,7 +97,7 @@ export function progression(sessions,wardrobe,legacy,now=Date.now()){
   const nextWorkoutXp=workoutXp(lastWeek===thisWeek?streak:activeStreak+1);
   const spent=items.filter(item=>wardrobe.owned.includes(item.id)).reduce((sum,item)=>sum+item.price,0)+
     backgrounds.filter(item=>wardrobe.ownedBackgrounds?.includes(item.id)).reduce((sum,item)=>sum+item.price,0);
-  const earned=(legacy.level-1)*50+(level-legacy.level)*COINS_PER_LEVEL;
+  const earned=(legacy.level-1)*50+(level-legacy.level)*COINS_PER_LEVEL+bonusCoins;
   return {xp,level,inLevel,target:levelTarget(level),coins:Math.max(0,earned-spent),streak:activeStreak,nextWorkoutXp};
 }
 
