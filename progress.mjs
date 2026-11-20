@@ -1,9 +1,66 @@
-import {addDays,dayKey,normalize} from './training.mjs';
+import {addDays,beatenRecords,completedBest,completedCount,dayKey,exerciseConfig,normalize,numberedCompletedSets,statsFor,weekStart,weightsFor} from './training.mjs';
 
 export function estimateOneRepMax(weight,reps){
   if(!Number.isFinite(weight)||weight<=0||!Number.isSafeInteger(reps)||reps<1) return null;
   const estimate=reps===1?weight:weight*(1+reps/30);
   return Number.isFinite(estimate)?estimate:null;
+}
+
+function recordedWeight(kg){
+  const text=String(kg??'').trim();
+  const weight=Number(text.replace(',','.'));
+  return text&&Number.isFinite(weight)&&weight>=0?weight:null;
+}
+
+export function exerciseWeightTrend(history){
+  return history.flatMap(session=>{
+    const weights=session.sets.map(set=>recordedWeight(set.kg)).filter(weight=>weight!==null);
+    return weights.length?[{...session,weight:Math.max(...weights)}]:[];
+  }).slice(0,8).reverse();
+}
+
+export function progressionAdvice(exercise,previousSets){
+  const {setCount,repMax}=exerciseConfig(exercise);
+  if(!repMax) return null;
+  const byNumber=new Map(previousSets.map(set=>[set.number,set]));
+  let weight;
+  let increase=true;
+  for(let number=1;number<=setCount;number++){
+    const set=byNumber.get(number);
+    const kg=recordedWeight(set?.kg),reps=Number(set?.reps);
+    if(kg===null||kg<=0||!Number.isInteger(reps)||reps<1||(weight!==undefined&&kg!==weight)) return null;
+    weight=kg;
+    if(reps<repMax) increase=false;
+  }
+  return {kind:increase?'increase':'repeat',weight};
+}
+
+export function latestMuscleWorkout(sessions,custom,muscle){
+  const ordered=sessions.filter(session=>Number.isFinite(session.finished)&&session.finished>0)
+    .sort((a,b)=>b.finished-a.finished);
+  for(const session of ordered){
+    const exercises=session.exercises.flatMap(exercise=>{
+      if(!(weightsFor(exercise.label,custom)?.[muscle]>0)) return [];
+      const sets=numberedCompletedSets(exercise.sets);
+      return sets.length?[{label:exercise.label,sets}]:[];
+    });
+    if(exercises.length) return {...session,exercises};
+  }
+  return null;
+}
+
+export function weeklyProgress(sessions,custom,now=Date.now()){
+  const today=dayKey(now),monday=weekStart(today);
+  const current=[],earlier=[];
+  for(const session of sessions){
+    if(!Number.isFinite(session.finished)||session.finished<=0||session.finished>now||!completedCount(session)) continue;
+    (dayKey(session.finished)>=monday?current:earlier).push(session);
+  }
+  const trained=Object.entries(statsFor(current,custom).map).sort(([,a],[,b])=>b.weighted-a.weighted)
+    .slice(0,3).map(([key])=>key);
+  const [highlight]=beatenRecords(completedBest(current),completedBest(earlier))
+    .sort((a,b)=>(b.kg-b.previous)-(a.kg-a.previous));
+  return {count:current.length,trained,highlight};
 }
 
 export function moveMonth(month,offset){

@@ -7,7 +7,7 @@ import {placeTattoo,tattooAreas,tattooFits,tattooFrame,tattooInks,tattooSlots} f
 import {plans,muscles,standard,example,normalize,weightsFor,completedCount,newDraft,blankSet,newId,weightMilestone,exerciseHistory,numberedCompletedSets,exerciseConfig,MAX_PLAN_SETS,MAX_PLAN_REPS,elapsedSeconds,remainingSeconds,timeLabel,statsFor,dayKey,weekKeys,recentSessions} from './training.mjs';
 
 import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,exerciseTechnique,hasMachineSettings,isBodyweightExercise,matchesExercise} from './catalog.mjs';
-import {estimateOneRepMax,filterSessions,monthGrid,moveMonth} from './progress.mjs';
+import {estimateOneRepMax,exerciseWeightTrend,filterSessions,latestMuscleWorkout,monthGrid,moveMonth,progressionAdvice,weeklyProgress} from './progress.mjs';
 import {previewFrames} from './exercise-preview.mjs';
 import {armRestSound,playRestSignal} from './rest-signal.mjs';
 import {createRestPush} from './rest-push.mjs';
@@ -545,9 +545,17 @@ function progressResults(){
     progressState.day?t('Tego dnia nie ma zapisanego treningu.'):t('Zapisane treningi pojawią się tutaj po zakończeniu pierwszej sesji.');
   return '<p class="empty">'+message+'</p>';
 }
+function weeklyProgressCard(){
+  const {count,trained,highlight}=weeklyProgress(data.sessions,data.custom);
+  return '<section class="card card-pad weekly-progress"><h2>'+t('Ten tydzień')+'</h2>'+
+    '<div class="weekly-progress-count"><strong>'+count+'</strong><span>'+t('Zapisane treningi')+'</span></div>'+
+    (trained.length?'<p class="meta">'+t('Najmocniej ćwiczone partie')+' <strong>'+trained.map(key=>esc(t(muscles[key]))).join(' · ')+'</strong></p>':'')+
+    (highlight?'<p class="weekly-progress-highlight">'+icon('bolt')+' <strong>'+esc(exerciseLabel(highlight.label))+'</strong> '+
+      formatKg.format(highlight.previous)+' → '+formatKg.format(highlight.kg)+' kg</p>':'')+'</section>';
+}
 function showProgress(){
   return heading('Progress',t('Zobacz dni treningowe i wróć do zapisanych sesji.'))+
-    '<div class="stack">'+liftCards(liftResults(data.sessions))+action(t('Kalkulator 1RM'),'one-rep-max','ghost full','dumbbell')+progressCalendar()+
+    '<div class="stack">'+liftCards(liftResults(data.sessions))+action(t('Kalkulator 1RM'),'one-rep-max','ghost full','dumbbell')+weeklyProgressCard()+progressCalendar()+
     '<section class="card card-pad progress-history"><h2>'+(progressState.day?fullDayFormatter.format(dateForKey(progressState.day)):t('Ostatnie treningi'))+'</h2>'+
     (progressState.day?action(t('Pokaż wszystkie dni'),'calendar-clear','ghost'):'')+
     '<div class="progress-filters"><label class="field">'+t('Nazwa treningu')+'<input id="progress-query" type="search" placeholder="'+t('np. Push A')+'" value="'+esc(progressState.query)+'"></label>'+
@@ -558,15 +566,42 @@ function showProgress(){
 function setResult({kg,reps}){
   return formatKg.format(Number(String(kg).replace(',','.')))+' kg × '+esc(reps)+' '+t('powt.');
 }
+function historySessionCard({name,finished,sets},attributes=''){
+  const day=dayKey(finished);
+  return '<article class="card card-pad logged-sets"'+attributes+'><time class="meta" datetime="'+day+'">'+fullDayFormatter.format(dateForKey(day))+'</time>'+
+    '<h3>'+esc(name)+'</h3><ol>'+sets.map(set=>'<li><span>'+t('Seria')+' '+set.number+'</span><strong>'+setResult(set)+'</strong></li>').join('')+
+    '</ol></article>';
+}
+function historyWeightChart(sessions){
+  const min=Math.min(...sessions.map(session=>session.weight));
+  const max=Math.max(...sessions.map(session=>session.weight));
+  const last=sessions.length-1;
+  const chart=sessions.map(({weight},index)=>[
+    last?7+86*index/last:50,
+    max===min?50:80-60*(weight-min)/(max-min),
+  ]);
+  return '<section class="stack history-chart"><h3>'+t('Najwyższy ciężar w sesji')+'</h3>'+
+    '<p class="meta">'+formatKg.format(min)+(max===min?'':'–'+formatKg.format(max))+' kg</p>'+
+    '<div class="history-plot" role="group" aria-label="'+t('Wykres ciężaru')+'"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'+
+    '<polyline vector-effect="non-scaling-stroke" points="'+chart.map(point=>point.join(',')).join(' ')+'"/></svg>'+
+    sessions.map((session,index)=>{
+      const [x,y]=chart[index];
+      const value=formatKg.format(session.weight)+' kg';
+      const label=value+' · '+formatter.format(session.finished)+' · '+session.name;
+      return '<button type="button" class="history-point" data-act="history-chart-point" data-key="'+index+'" style="left:'+x+'%;top:'+y+'%"'+
+        ' aria-pressed="'+(index===last)+'" aria-label="'+esc(label)+'" title="'+esc(label)+'"><i aria-hidden="true"></i></button>';
+    }).join('')+'</div>'+
+    '<div class="history-plot-labels"><span>'+formatter.format(sessions[0].finished)+'</span>'+
+    (last?'<span>'+formatter.format(sessions[last].finished)+'</span>':'')+'</div>'+
+    '<div aria-live="polite">'+sessions.map((session,index)=>historySessionCard(session,' data-chart-session="'+index+'"'+(index!==last?' hidden':''))).join('')+'</div></section>';
+}
 function openExerciseHistory(label){
   const history=exerciseHistory(data.sessions,label);
-  const content=history.length?history.map(({name,finished,sets})=>{
-    const day=dayKey(finished);
-    return '<article class="card card-pad logged-sets"><time class="meta" datetime="'+day+'">'+fullDayFormatter.format(dateForKey(day))+'</time>'+
-      '<h3>'+esc(name)+'</h3><ol>'+sets.map(set=>'<li><span>'+t('Seria')+' '+set.number+'</span><strong>'+setResult(set)+'</strong></li>').join('')+
-      '</ol></article>';
-  }).join(''):'<p class="empty">'+t('To ćwiczenie nie ma jeszcze zapisanych serii.')+'</p>';
-  openModal(esc(exerciseLabel(label)),'<p class="meta">'+t('Historia ćwiczenia')+'</p><div class="stack">'+content+'</div>');
+  const trend=exerciseWeightTrend(history);
+  const list='<div class="stack">'+history.map(session=>historySessionCard(session)).join('')+'</div>';
+  const content=!history.length?'<p class="empty">'+t('To ćwiczenie nie ma jeszcze zapisanych serii.')+'</p>':
+    trend.length?historyWeightChart(trend)+'<details class="history-full"><summary>'+t('Pełna historia')+'</summary>'+list+'</details>':list;
+  openModal(esc(exerciseLabel(label)),'<p class="meta">'+t('Historia ćwiczenia')+'</p>'+content);
   dialog.scrollTop=0;
 }
 function setRow(set,i,j,previous){
@@ -597,17 +632,25 @@ function repTarget(exercise){
   const reps=exercise.repMin===exercise.repMax?exercise.repMin:exercise.repMin+'–'+exercise.repMax;
   return '<p class="rep-target">'+t('Cel:')+' '+esc(reps)+' '+t('powt. na serię')+'</p>';
 }
-function previousSetsByNumber(label){
-  const previous=exerciseHistory(data.sessions,label)[0]?.sets??[];
+function previousSetsByNumber(previous){
   const byNumber=new Map(previous.map(set=>[set.number,set]));
   if(previous.length&&!byNumber.has(1)) byNumber.set(1,previous[0]);
   return byNumber;
+}
+function exerciseProgressionHint(exercise,index,previous){
+  if(data.draft.dismissedAdvice?.includes(exerciseKey(exercise.label))) return '';
+  const advice=progressionAdvice(exercise,previous);
+  if(!advice) return '';
+  return '<div class="exercise-advice"><p><strong>'+t('Podpowiedź progresji')+'</strong> '+
+    t(advice.kind==='increase'?'Rozważ małą podwyżkę z {kg} kg.':'Powtórz {kg} kg.').replace('{kg}',formatKg.format(advice.weight))+'</p>'+
+    '<button type="button" class="btn ghost" data-act="dismiss-exercise-advice" data-ex="'+index+'">'+t('Pomiń')+'</button></div>';
 }
 function exerciseCard(exercise,i,notes){
   const label=esc(exerciseLabel(exercise.label));
   const key=exerciseKey(exercise.label);
   const workoutId=data.draft.id;
-  const previousByNumber=previousSetsByNumber(exercise.label);
+  const previous=exerciseHistory(data.sessions,exercise.label)[0]?.sets??[];
+  const previousByNumber=previousSetsByNumber(previous);
   const machine=hasMachineSettings(exercise.label);
   const note=notes.exercises?.[key];
   const settings=machine?readJournal('machine',key).note:null;
@@ -619,7 +662,7 @@ function exerciseCard(exercise,i,notes){
     '<button type="button" class="btn ghost" data-act="remove-exercise" data-ex="'+i+'" aria-label="'+t('Usuń ćwiczenie')+' '+label+'">'+icon('x')+'</button></div>'+
     '<div class="exercise-toolbar">'+restSetting(exercise,i,'workout')+journalButton('exercise',workoutId,i)+'</div>'+
     ([note,settings].some(Boolean)?'<div class="exercise-journal-preview">'+[note,settings].filter(Boolean).map(text=>'<p>'+esc(text)+'</p>').join('')+'</div>':'')+
-    repTarget(exercise)+
+    repTarget(exercise)+exerciseProgressionHint(exercise,i,previous)+
     '<div class="set-list">'+exercise.sets.map((s,j)=>setRow(s,i,j,previousByNumber.get(j+1))).join('')+'</div>'+
     '<div class="exercise-set-actions"><button type="button" class="btn ghost" data-act="add-set" data-ex="'+i+'">'+icon('plus')+' '+t('Dodaj serię')+'</button>'+
     (exercise.sets.some(set=>!set.done)?'<button type="button" class="btn ghost" data-act="replace-exercise" data-ex="'+i+'">'+icon('swap')+' '+t('Zamień na dziś')+'</button>':'')+'</div></section>';
@@ -664,7 +707,7 @@ function showTraining(){
   const notes=readJournal('workout',draft.id);
   return '<div class="training-main">'+heading(esc(draft.name),t('Wpisz ciężar i powtórzenia, potem odhacz wykonaną serię.'),action(t('Zmień nazwę'),'rename-draft','ghost rename','edit'))+'<div class="stack">'+
     '<section class="card card-pad session-hdr"><div class="card-head"><div><span class="eyebrow">'+t('Czas treningu')+'</span><div class="workout-clock" aria-label="'+t('Czas treningu')+'" data-elapsed></div><p class="meta">'+t('Ukończone serie:')+' '+count+'</p></div>'+
-    '<button class="btn primary" type="button" data-act="finish" '+(!count?'disabled':'')+'>'+icon('check')+' '+t('Zakończ')+'</button></div>'+workoutPhotoImage()+workoutPhotoButton(draft.id)+
+    '<button class="btn primary" type="button" data-act="finish" '+(!count?'disabled':'')+'>'+icon('check')+' '+t('Zakończ')+'</button></div>'+workoutPhotoImage()+
     journalBlock('workout',draft.id,notes.note,undefined,notes.withFriend)+'</section>'+
     draft.exercises.map((exercise,i)=>exerciseCard(exercise,i,notes)).join('')+
     action(t('Dodaj ćwiczenia'),'workout-picker','primary full','plus')+
@@ -1221,6 +1264,7 @@ function openMuscle(key){
   const context=mapData();
   const stat=context.map[key];
   const value=intensity(context,key);
+  const latest=latestMuscleWorkout(data.sessions,data.custom,key);
   const visible=[...document.querySelectorAll('.figure .glow')];
   for (const layer of visible) {
     if (layer.dataset.glow===key) {
@@ -1231,8 +1275,12 @@ function openMuscle(key){
   }
   openModal(esc(t(activeModel().layout[side].warstwy[key].nazwa)),
     (context.demo?'<p class="meta">'+t('Przykładowe obciążenie')+'</p>':'<div class="stats"><div><span class="meta">'+t('Liczba serii')+'</span><strong>'+(stat?.sets??0)+'</strong></div><div><span class="meta">'+t('Ostatni trening')+'</span><strong>'+
-    (stat?.recent?formatter.format(stat.recent):'–')+'</strong></div></div>')+
-    '<p class="meta">'+t('Intensywność na mapie:')+' '+Math.round(value*100)+'%</p>'+action(t('Zamknij'),'close','primary'));
+    (latest?formatter.format(latest.finished):'–')+'</strong></div></div>')+
+    '<p class="meta">'+t('Intensywność na mapie:')+' '+Math.round(value*100)+'%</p>'+
+    (latest?'<section class="card card-pad stack"><h3>'+esc(latest.name)+'</h3>'+latest.exercises.map(exercise=>
+      '<p><strong>'+esc(exerciseLabel(exercise.label))+'</strong><br><span class="meta">'+exercise.sets.map(setResult).join(' · ')+'</span></p>').join('')+
+      friendButton('details',latest.id,t('Otwórz trening'))+'</section>':'<p class="meta">'+t('Brak zapisanych treningów tej partii.')+'</p>')+
+    action(t('Zamknij'),'close','primary'));
   dialog.addEventListener('close',()=>{
     for(const layer of visible){
       layer.style.removeProperty('opacity');
@@ -1296,7 +1344,9 @@ function journalButton(kind,id,index){
     (machine?icon('settings'):icon('edit')+' '+title)+'</button>';
 }
 function journalBlock(kind,id,note,index,withFriend=false){
-  return '<div class="journal-block">'+journalButton(kind,id,index)+
+  const button=journalButton(kind,id,index);
+  const actions=kind==='workout'?'<div class="workout-actions">'+workoutPhotoButton(id)+button+'</div>':button;
+  return '<div class="journal-block">'+actions+
     (withFriend?'<span class="journal-partner">'+icon('clan')+' '+t('Trening ze znajomym')+'</span>':'')+
     (note?'<p>'+esc(note)+'</p>':'')+'</div>';
 }
@@ -1452,10 +1502,13 @@ function details(id){
   const notes=readJournal('workout',id);
   const lines=session.exercises.map((e,i)=>{
     const sets=e.sets.filter(s=>s.done);
-    return sets.length?'<div><h3>'+esc(exerciseLabel(e.label))+'</h3><p class="meta">'+sets.map(s=>esc(s.kg)+' kg × '+esc(s.reps)).join(' · ')+'</p>'+
+    const label=esc(exerciseLabel(e.label));
+    return sets.length?'<div><h3><button type="button" class="exercise-history-trigger" data-act="exercise-history" data-key="'+esc(e.label)+
+      '" aria-haspopup="dialog" aria-label="'+label+' · '+t('Historia ćwiczenia')+'">'+label+icon('calendar')+'</button></h3>'+
+      '<p class="meta">'+sets.map(s=>esc(s.kg)+' kg × '+esc(s.reps)).join(' · ')+'</p>'+
       journalBlock('exercise',id,notes.exercises?.[exerciseKey(e.label)],i)+'</div>':'';
   }).join('');
-  openModal(esc(session.name),'<p class="meta">'+formatter.format(session.finished)+' '+t('· Serii:')+' '+completedCount(session)+' '+t('· Czas:')+' '+timeLabel(elapsedSeconds(session.started,session.finished),true)+'</p>'+workoutPhotoImage()+'<p class="meta workout-photo-visibility" hidden></p>'+workoutPhotoButton(id)+
+  openModal(esc(session.name),'<p class="meta">'+formatter.format(session.finished)+' '+t('· Serii:')+' '+completedCount(session)+' '+t('· Czas:')+' '+timeLabel(elapsedSeconds(session.started,session.finished),true)+'</p>'+workoutPhotoImage()+'<p class="meta workout-photo-visibility" hidden></p>'+
     journalBlock('workout',id,notes.note,undefined,notes.withFriend)+lines+
     '<button type="button" class="btn ghost" data-act="rename-session" data-key="'+esc(id)+'">'+icon('edit')+' '+t('Zmień nazwę')+'</button>'+
     '<button type="button" class="btn primary" data-act="session-map" data-key="'+esc(id)+'">'+t('Pokaż mapę')+' '+icon('arrow')+'</button>');
@@ -1710,7 +1763,8 @@ function toggleSet(exercise,set,button){
   if(!set.done){
     const enteredKg=String(set.kg??'').trim();
     const enteredReps=String(set.reps??'').trim();
-    const previous=enteredKg&&enteredReps?null:previousSetsByNumber(exercise.label).get(Number(button.dataset.set)+1);
+    const previous=enteredKg&&enteredReps?null:previousSetsByNumber(exerciseHistory(data.sessions,exercise.label)[0]?.sets??[])
+      .get(Number(button.dataset.set)+1);
     const kg=String(enteredKg||(previous?.kg??(isBodyweightExercise(exercise.label)?'0':''))).replace(',','.');
     const reps=String(enteredReps||(previous?.reps??''));
     const validReps=/^\d+$/.test(reps)&&Number.isSafeInteger(Number(reps))&&Number(reps)>0;
@@ -2143,7 +2197,17 @@ document.addEventListener('click',async event=>{
     case 'catalog-custom':openOwnExercise();break;
     case 'catalog-back':showPicker();break;
     case 'technique':technique(key);break;
-    case 'exercise-history':if(exercise) openExerciseHistory(exercise.label);break;
+    case 'exercise-history':if(exercise||key) openExerciseHistory(exercise?.label??key);break;
+    case 'history-chart-point':
+      for(const point of dialog.querySelectorAll('[data-act="history-chart-point"]')) point.setAttribute('aria-pressed',String(point===button));
+      for(const session of dialog.querySelectorAll('[data-chart-session]')) session.hidden=session.dataset.chartSession!==key;
+      break;
+    case 'dismiss-exercise-advice':
+      if(exercise){
+        data.draft.dismissedAdvice=[...new Set([...(data.draft.dismissedAdvice??[]),exerciseKey(exercise.label)])];
+        save();render();
+      }
+      break;
     case 'catalog-apply':applyPicker();break;
     case 'custom-start':
       openModal(t('Rozpocznij nowy trening'),'<form id="new-custom" class="stack"><label class="field">'+t('Nazwa treningu')+'<input name="label" placeholder="'+t('np. Góra ciała')+'" maxlength="60" required autofocus></label><button class="btn primary">'+t('Rozpocznij')+'</button></form>');

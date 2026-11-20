@@ -118,8 +118,8 @@ h3{font-size:18px;letter-spacing:-.025em}
 .photo-fields button[hidden],.photo-fields [data-photo-visibility][hidden],.workout-photo-thumb[hidden]{display:none}
 .photo-fields input[type="file"]{min-width:0;max-width:100%;color:var(--text)}
 .photo-fields input::file-selector-button{margin-right:8px;padding:6px 8px;border:1px solid #59386f;border-radius:6px;background:#302040;color:var(--text)}
-.workout-photo-button{justify-self:start}
-.session-hdr .workout-photo-button{margin-top:10px}
+.workout-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+.session-hdr .workout-actions{margin-top:10px}
 .workout-photo{width:100%;max-height:min(52dvh,430px);object-fit:contain;border-radius:10px;background:#140f1b}
 .session-hdr .workout-photo{display:block;max-height:min(28dvh,240px);margin-top:10px}
 .session-hdr .workout-photo[hidden]{display:none}
@@ -168,6 +168,7 @@ input,select{min-width:0;width:100%;min-height:43px;color:var(--text);background
 .set-card-actions{display:grid;grid-template-columns:repeat(2,44px);gap:4px}
 .previous-set strong{color:var(--muted);font-variant-numeric:tabular-nums}
 .set-card-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.set-row:not(.checked) .set-card-fields input{color:var(--muted)}
 .set-card-fields input::placeholder{color:var(--muted);opacity:1}
 .icon-btn{display:inline-grid;place-items:center;border:1px solid #3f304d;background:#261d2f;color:#cfc1d9;border-radius:8px;min-height:42px;width:100%;padding:0}
 .icon-btn svg{width:17px;height:17px}
@@ -328,6 +329,8 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .field textarea{font:inherit;font-size:16px;resize:vertical;color:var(--text);background:#140f1b;border:1px solid #4a3b57;border-radius:8px;padding:8px 10px;min-width:0}
 .journal-block{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}
 .journal-block .journal-edit{min-height:38px;padding:6px 9px;font-size:12px}
+.workout-actions .workout-photo-button,.workout-actions .journal-edit{min-width:0;min-height:44px;padding:6px 9px;font-size:12px;text-align:center}
+.workout-actions .btn svg{flex:none}
 .journal-block p,.exercise-journal-preview p{color:var(--muted);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
 .journal-block p{flex:0 0 100%}
 .exercise-journal-preview{display:grid;gap:4px;margin-bottom:9px}
@@ -468,6 +471,10 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .rep-range>div{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:6px}
 .plan-exercise .rest-setting{justify-self:start;margin:0}
 .rep-target{display:inline-block;margin:0 0 10px;padding:4px 8px;background:#30203c;border-radius:6px;color:#e0b7ff;font-size:12px;font-weight:750}
+.exercise-advice{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;padding:7px 9px;border:1px solid #513461;border-radius:9px;background:#291a36}
+.exercise-advice p{color:var(--muted);font-size:12px;line-height:1.45}
+.exercise-advice strong{display:block;color:#e8c9fb}
+.exercise-advice .btn{min-height:38px;padding:4px 9px;font-size:12px}
 .template-group{display:grid;gap:6px;min-width:0}
 .template-config{font-size:12px;min-height:40px;padding:4px}
 .template-config svg{width:15px;height:15px}
@@ -552,6 +559,22 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .logged-sets ol{margin:9px 0 0;padding:0;list-style:none}
 .logged-sets li{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);color:var(--muted)}
 .logged-sets li strong{color:var(--text);white-space:nowrap}
+.history-chart{gap:8px}
+.history-plot{position:relative;height:140px;border:1px solid #523963;border-radius:12px;background:repeating-linear-gradient(0deg,transparent 0 33px,#694a7c50 34px 35px),#211729}
+.history-plot svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.history-plot polyline{fill:none;stroke:#b879f6;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.history-point{position:absolute;display:grid;place-items:center;width:34px;height:44px;padding:0;transform:translate(-50%,-50%);border:0;border-radius:8px;background:transparent;cursor:pointer}
+.history-point i{width:10px;height:10px;border:2px solid #e4c2ff;border-radius:50%;background:#663497}
+.history-point[aria-pressed="true"] i{width:14px;height:14px;background:#f1d9ff;box-shadow:0 0 10px #ca81fb}
+.history-plot-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:12px}
+.history-full summary{padding:7px 0;color:#dfb4fe;font-size:14px;font-weight:750;cursor:pointer}
+.history-full[open] summary{margin-bottom:8px}
+.weekly-progress{display:grid;gap:8px}
+.weekly-progress-count{display:flex;align-items:baseline;gap:7px;color:var(--muted);font-size:13px}
+.weekly-progress-count strong{color:#eacbff;font-size:24px}
+.weekly-progress .meta strong{color:var(--text)}
+.weekly-progress-highlight{display:flex;align-items:center;flex-wrap:wrap;gap:5px;color:#e9cbff;font-size:13px}
+.weekly-progress-highlight svg{width:17px;height:17px;color:var(--purple)}
 .clan-chat{display:grid;gap:11px}
 .clan-feed{display:flex;flex-direction:column;gap:9px;padding:3px;max-height:55dvh;overflow:auto;overscroll-behavior:contain;min-height:90px}
 .clan-message{border:1px solid #473153;border-radius:10px;background:#21182a;padding:9px;max-width:90%}
