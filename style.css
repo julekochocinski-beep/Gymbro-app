@@ -371,9 +371,10 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .tank-fit-frame,.tank-fit{position:absolute;inset:0}
 .tank-fit-frame:has(img){filter:drop-shadow(0 1px 1px #100a1a70)}
 .tank-fit{
-  -webkit-mask:var(--tank-fit) center/100% 100% no-repeat;
-  mask:var(--tank-fit) center/100% 100% no-repeat
+  -webkit-mask:var(--tank-fit,none) center/100% 100% no-repeat;
+  mask:var(--tank-fit,none) center/100% 100% no-repeat
 }
+.tank-fit img[data-worn="tank-black"],.outfit-thumb img[data-item="tank-black"]{filter:brightness(.41) contrast(1.3)}
 .tattoo-ink{
   background:#1a111e;
   -webkit-mask:var(--tattoo-art) center/contain no-repeat;

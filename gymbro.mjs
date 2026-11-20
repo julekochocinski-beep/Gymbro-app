@@ -11,7 +11,7 @@ const workoutXp=streak=>XP_PER_DAY+(streak>=2?5*Math.min(5,streak):0);
 // Layer order follows the supplied clothing assets.
 export const items=[
   {id:'tank-white',name:'Biały tank top',slot:'Na tułów',wearSlot:'torso',category:'clothes',price:45,back:true},
-  {id:'tank-black',name:'Czarny tank top',slot:'Na tułów',wearSlot:'torso',category:'clothes',price:45,back:true},
+  {id:'tank-black',art:'tank-white',name:'Czarny tank top',slot:'Na tułów',wearSlot:'torso',category:'clothes',price:45,back:true},
   {id:'bandana',name:'Czerwona bandana',slot:'Na ramię',category:'accessories',price:30,back:true},
   {id:'lancuch',name:'Złoty łańcuch',slot:'Na szyję',category:'accessories',price:50,back:true},
   {id:'okulary',name:'Fioletowe okulary',slot:'Na twarz',category:'accessories',price:40,back:false},

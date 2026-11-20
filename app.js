@@ -306,13 +306,16 @@ function buddyModel(view,preview=null,shine=null,{worn=data.wardrobe.worn,tattoo
   const visible=items.filter(item=>item.category!=='tattoos'&&(view==='przod'||item.back)&&
     (trial===item||worn.includes(item.id)&&(!trial?.wearSlot||item.wearSlot!==trial.wearSlot)));
   const asset=model.root+'ubrania/'+view+'-';
-  const glint=visible.some(item=>item.id===shine)?
-    fitTankLayer(shine,'<span class="outfit-glint" aria-hidden="true" style="--outfit-mask:url('+asset+shine+'.webp)"></span>'):'';
+  const sprite=item=>asset+(item.art??item.id)+'.webp';
+  const flashed=visible.find(item=>item.id===shine);
+  const glint=flashed?
+    fitTankLayer(flashed.id,'<span class="outfit-glint" aria-hidden="true" style="--outfit-mask:url('+sprite(flashed)+')"></span>'):'';
   const base=asset+'baza.webp';
   const finish=skin==='default'?'':'<span class="buddy-finish" style="--buddy-art:url('+base+')" aria-hidden="true"></span>';
-  return '<div class="buddy-figure" data-model="'+model.id+'" data-skin="'+esc(skin)+'" style="aspect-ratio:'+width+'/'+height+';--tank-fit:url('+asset+'tank-fit.svg)"><img class="buddy-base" src="'+base+'" alt="'+description+'" draggable="false">'+finish+
+  const tankFit=model.id==='slon'&&view==='tyl'?';--tank-fit:url('+asset+'tank-fit.svg)':'';
+  return '<div class="buddy-figure" data-model="'+model.id+'" data-skin="'+esc(skin)+'" style="aspect-ratio:'+width+'/'+height+tankFit+'"><img class="buddy-base" src="'+base+'" alt="'+description+'" draggable="false">'+finish+
     (view==='przod'?tattooLayers(model,tattoos??{},preview):'')+
-    visible.map(item=>fitTankLayer(item.id,'<img src="'+asset+item.id+'.webp" data-worn="'+item.id+'" alt="'+t(item.name)+'" draggable="false">')).join('')+glint+'</div>';
+    visible.map(item=>fitTankLayer(item.id,'<img src="'+sprite(item)+'" data-worn="'+item.id+'" alt="'+t(item.name)+'" draggable="false">')).join('')+glint+'</div>';
 }
 function homeBuddy(){
   const player=currentProgress();
@@ -327,7 +330,7 @@ function wardrobeItem(item,coins){
   const wearing=worn.includes(item.id);
   const trying=tryOn?.id===item.id;
   const attr=' type="button" data-key="'+item.id+'"';
-  return '<article class="outfit-row"><div class="outfit-thumb"><img src="'+activeModel().root+'ubrania/produkt-'+item.id+'.webp" alt=""></div>'+
+  return '<article class="outfit-row"><div class="outfit-thumb"><img src="'+activeModel().root+'ubrania/produkt-'+(item.art??item.id)+'.webp" data-item="'+item.id+'" alt=""></div>'+
     '<div class="outfit-description"><h3>'+t(item.name)+'</h3><span class="meta">'+t(item.slot)+(wearing?' '+t('· Założone'):fits?' '+t('· Kupione'):'')+'</span>'+
     '<div class="outfit-actions">'+(fits?'<button class="btn ghost" data-act="outfit-toggle"'+attr+' aria-label="'+(wearing?t('Zdejmij')+' ':t('Załóż')+' ')+t(item.name)+'">'+(wearing?t('Zdejmij'):t('Załóż'))+'</button>':
       '<button class="btn ghost" data-act="outfit-try"'+attr+' aria-pressed="'+trying+'" aria-label="'+t('Przymierz:')+' '+t(item.name)+'">'+(trying?t('Zakończ podgląd'):t('Przymierz'))+'</button>'+
