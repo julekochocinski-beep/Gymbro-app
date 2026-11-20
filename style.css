@@ -168,8 +168,8 @@ input,select{min-width:0;width:100%;min-height:43px;color:var(--text);background
 .set-card-actions{display:grid;grid-template-columns:repeat(2,44px);gap:4px}
 .previous-set strong{color:var(--muted);font-variant-numeric:tabular-nums}
 .set-card-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.set-row:not(.checked) .set-card-fields input{color:var(--muted)}
 .set-card-fields input::placeholder{color:var(--muted);opacity:1}
+.set-card-fields input:focus::placeholder{color:transparent}
 .icon-btn{display:inline-grid;place-items:center;border:1px solid #3f304d;background:#261d2f;color:#cfc1d9;border-radius:8px;min-height:42px;width:100%;padding:0}
 .icon-btn svg{width:17px;height:17px}
 .icon-btn[aria-pressed="true"]{color:#efdcff;border-color:#a05bdd;background:#46245c}
