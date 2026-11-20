@@ -105,7 +105,7 @@ const english={
   "Siatka": "Grid",
   "Orbity": "Orbits",
   "Kuźnia": "Forge",
-  "Nagroda za Golema": "Golem reward",
+  "Domyślne tło": "Default background",
   "Aktywne": "Active",
   "Pusty zestaw": "Empty slot",
   "Zapisz obecny styl": "Save current look",

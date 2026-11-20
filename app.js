@@ -243,7 +243,7 @@ function sessionRows(sessions){
 }
 function currentProgress(){
   const now=Date.now();
-  const key=data.sessions.length+'|'+data.wardrobe.owned.length+'|'+dayKey(now);
+  const key=data.sessions.length+'|'+data.wardrobe.owned.length+'|'+data.wardrobe.ownedBackgrounds.length+'|'+dayKey(now);
   if(key!==progressCacheKey){
     progressCache=progression(data.sessions,data.wardrobe,data.xpBaseline,now);
     progressCacheKey=key;
@@ -411,15 +411,14 @@ function characterRows(){
 function backgroundRows(coins){
   const {background,ownedBackgrounds}=data.wardrobe;
   return '<div class="background-list">'+backgrounds.map(item=>{
-    const owned=item.price===0||ownedBackgrounds.includes(item.id);
+    const owned=ownedBackgrounds.includes(item.id);
     const key=' data-key="'+item.id+'"';
     return '<article class="background-card"><button type="button" class="background-swatch" data-background="'+item.id+'" data-act="preview-background"'+key+
       ' aria-label="'+t('Przymierz')+' '+t(item.name)+'" aria-pressed="'+(previewBackground===item.id)+'"></button>'+
       '<h3>'+t(item.name)+'</h3>'+
-      (item.price===null?'<p class="meta">'+t('Nagroda za Golema')+'</p>':
-        '<button type="button" class="btn ghost" data-act="equip-background"'+key+
+      '<button type="button" class="btn ghost" data-act="equip-background"'+key+
         ((owned&&background===item.id)||(!owned&&coins<item.price)?' disabled':'')+'>'+
-        (owned?t(background===item.id?'Aktywne':'Ustaw'):t('Kup')+' '+icon('coin')+' '+item.price)+'</button>')+'</article>';
+        (owned?t(background===item.id?'Aktywne':'Ustaw'):t('Kup')+' '+icon('coin')+' '+item.price)+'</button></article>';
   }).join('')+'</div>';
 }
 function savedStyleRows(){
@@ -427,7 +426,7 @@ function savedStyleRows(){
     const look=data.wardrobe.styles[index];
     const key=' data-key="'+index+'"';
     return '<article class="card card-pad"><h3>'+t('Styl')+' '+(index+1)+'</h3>'+
-      (look?'<p class="meta">'+t(modelFor(look.model).name)+' · '+t(backgrounds.find(item=>item.id===backgroundId(look.background)).name)+'</p>':
+      (look?'<p class="meta">'+t(modelFor(look.model).name)+' · '+t(backgrounds.find(item=>item.id===look.background)?.name??'Domyślne tło')+'</p>':
         '<p class="meta">'+t('Pusty zestaw')+'</p>')+
       '<div class="controls">'+(look?'<button type="button" class="btn ghost" data-act="load-style"'+key+'>'+t('Załóż')+'</button>':'')+
       '<button type="button" class="btn ghost" data-act="save-style"'+key+'>'+t(look?'Zastąp stylem obecnym':'Zapisz obecny styl')+'</button></div></article>';
@@ -647,13 +646,14 @@ function openExerciseHistory(label){
 function setRow(set,i,j,previous){
   const ref=' data-ex="'+i+'" data-set="'+j+'"';
   const number=j+1;
+  const suggestion=setSuggestion(set,previous);
   return '<div class="set-row '+(set.done?'checked':'')+'"><div class="set-card-head"><strong>'+t('Seria')+' '+number+'</strong><div class="set-card-actions">'+
     '<button type="button" class="icon-btn" data-act="check"'+ref+' aria-pressed="'+set.done+'" aria-label="'+(set.done?t('Cofnij ukończenie'):t('Ukończ serię'))+' '+(j+1)+'">'+icon('check')+'</button>'+
     '<button type="button" class="icon-btn del" data-act="remove-set"'+ref+' aria-label="'+t('Usuń serię')+' '+number+'">'+icon('x')+'</button></div></div>'+
     (previous?'<p class="meta previous-set">'+t('Poprzednio')+' <strong>'+setResult(previous)+'</strong></p>':'')+
     '<div class="set-card-fields"><label class="field">'+t('Ciężar (kg)')+
-    '<input type="text" inputmode="decimal" maxlength="8" placeholder="'+esc(previous?.kg??'')+'" data-field="kg"'+ref+' value="'+esc(set.kg)+'" aria-label="'+t('Ciężar w kg, seria')+' '+number+'"></label>'+
-    '<label class="field">'+t('Powtórzenia')+'<input type="text" inputmode="numeric" maxlength="4" placeholder="'+esc(previous?.reps??'')+'" data-field="reps"'+ref+
+    '<input type="text" inputmode="decimal" maxlength="8" placeholder="'+esc(suggestion.kg)+'" data-field="kg"'+ref+' value="'+esc(set.kg)+'" aria-label="'+t('Ciężar w kg, seria')+' '+number+'"></label>'+
+    '<label class="field">'+t('Powtórzenia')+'<input type="text" inputmode="numeric" maxlength="4" placeholder="'+esc(suggestion.reps)+'" data-field="reps"'+ref+
     ' value="'+esc(set.reps)+'" aria-label="'+t('Powtórzenia, seria')+' '+number+'"></label></div></div>';
 }
 function techniqueButton(label){
@@ -676,6 +676,19 @@ function previousSetsByNumber(previous){
   const byNumber=new Map(previous.map(set=>[set.number,set]));
   if(previous.length&&!byNumber.has(1)) byNumber.set(1,previous[0]);
   return byNumber;
+}
+function setSuggestion(set,previous){
+  return {kg:String(set.suggestion?.kg??previous?.kg??''),reps:String(set.suggestion?.reps??previous?.reps??'')};
+}
+function addSet(exercise){
+  const last=exercise.sets.at(-1);
+  const next=blankSet();
+  if(last){
+    const kg=String(last.kg??'').trim()||last.suggestion?.kg;
+    const reps=String(last.reps??'').trim()||last.suggestion?.reps;
+    if(kg||reps) next.suggestion={kg,reps};
+  }
+  exercise.sets.push(next);
 }
 function exerciseProgressionHint(exercise,index,previous){
   if(data.draft.dismissedAdvice?.includes(exerciseKey(exercise.label))) return '';
@@ -1860,8 +1873,9 @@ function toggleSet(exercise,set,button){
     const enteredReps=String(set.reps??'').trim();
     const previous=enteredKg&&enteredReps?null:previousSetsByNumber(exerciseHistory(data.sessions,exercise.label)[0]?.sets??[])
       .get(Number(button.dataset.set)+1);
-    const kg=String(enteredKg||(previous?.kg??(isBodyweightExercise(exercise.label)?'0':''))).replace(',','.');
-    const reps=String(enteredReps||(previous?.reps??''));
+    const suggestion=setSuggestion(set,previous);
+    const kg=String(enteredKg||suggestion.kg||(isBodyweightExercise(exercise.label)?'0':'')).replace(',','.');
+    const reps=String(enteredReps||suggestion.reps);
     const validReps=/^\d+$/.test(reps)&&Number.isSafeInteger(Number(reps))&&Number(reps)>0;
     const validKg=/^\d+(\.\d+)?$/.test(kg)&&Number.isFinite(Number(kg));
     if(!validReps||!validKg){
@@ -1871,6 +1885,7 @@ function toggleSet(exercise,set,button){
     }
     set.kg=kg;
     set.reps=String(Number(reps));
+    delete set.suggestion;
     const key=exerciseKey(exercise.label);
     const seen=data.draft.announcedRecords;
     const announced=seen&&Object.hasOwn(seen,key)?seen[key]:0;
@@ -2209,8 +2224,8 @@ document.addEventListener('click',async event=>{
       break;
     case 'equip-background':{
       const item=backgrounds.find(entry=>entry.id===key);
-      if(!item||item.price===null) break;
-      if(item.price>0&&!data.wardrobe.ownedBackgrounds.includes(key)){
+      if(!item) break;
+      if(!data.wardrobe.ownedBackgrounds.includes(key)){
         if(currentProgress().coins<item.price) break;
         data.wardrobe.ownedBackgrounds.push(key);
       }
@@ -2380,10 +2395,7 @@ document.addEventListener('click',async event=>{
     case 'skip-rest':delete data.draft.rest;save();renderRest();break;
     case 'check':if(set)toggleSet(exercise,set,button);break;
     case 'add-set':
-      if(exercise){
-        const last=exercise.sets.at(-1);
-        exercise.sets.push(last?{kg:last.kg,reps:last.reps,done:false}:blankSet());save();render();
-      }
+      if(exercise){addSet(exercise);save();render();}
       break;
     case 'remove-set':if(set){cancelRestForSet(set);exercise.sets.splice(Number(idx),1);save();render();}break;
     case 'remove-exercise':

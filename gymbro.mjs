@@ -9,12 +9,12 @@ const levelTarget=level=>100+(level-1)*50;
 const workoutXp=streak=>XP_PER_DAY+(streak>=2?5*Math.min(5,streak):0);
 
 export const backgrounds=[
-  {id:'aura',name:'Aura',price:0},
-  {id:'grid',name:'Siatka',price:25},
-  {id:'orbits',name:'Orbity',price:40},
-  {id:'forge',name:'Kuźnia',price:null},
-];
-export const backgroundId=id=>backgrounds.some(item=>item.id===id)?id:'aura';
+  {id:'aura',name:'Aura'},
+  {id:'grid',name:'Siatka'},
+  {id:'orbits',name:'Orbity'},
+  {id:'forge',name:'Kuźnia'},
+].map(background=>({...background,price:10}));
+export const backgroundId=id=>backgrounds.some(item=>item.id===id)?id:'default';
 
 // Layer order follows the supplied clothing assets.
 export const items=[
@@ -28,7 +28,7 @@ export const items=[
 
 export function wardrobeFrom(stored){
   const owned=items.filter(item=>stored?.owned?.includes(item.id)).map(item=>item.id);
-  const ownedBackgrounds=backgrounds.filter(item=>item.price>0&&stored?.ownedBackgrounds?.includes(item.id)).map(item=>item.id);
+  const ownedBackgrounds=backgrounds.filter(item=>stored?.ownedBackgrounds?.includes(item.id)).map(item=>item.id);
   const appearance=lookFrom(stored,owned,ownedBackgrounds);
   const styles=Array.isArray(stored?.styles)?stored.styles.slice(0,3).map(style=>style?lookFrom(style,owned,ownedBackgrounds):null):[];
   return {...appearance,owned,ownedBackgrounds,styles};
@@ -38,7 +38,7 @@ function lookFrom(stored,owned,ownedBackgrounds){
   const worn=[];
   for(const item of items) if(item.category!=='tattoos'&&owned.includes(item.id)&&stored?.worn?.includes(item.id)) equipItem(worn,item);
   return {worn,tattoos:tattoosFrom(stored?.tattoos,owned),skin:stored?.skin??'default',model:modelFor(stored?.model).id,
-    background:ownedBackgrounds.includes(stored?.background)?stored.background:'aura'};
+    background:ownedBackgrounds.includes(stored?.background)?stored.background:'default'};
 }
 
 function equipItem(worn,item){

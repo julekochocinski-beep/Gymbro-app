@@ -396,13 +396,13 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .buddy-stage:has(> .buddy-figure[data-skin]:not([data-skin="default"]))::after{content:none}
 [data-background="grid"]{background:radial-gradient(ellipse at 50% 44%,#472553 0%,transparent 70%),repeating-linear-gradient(0deg,transparent 0 20px,#b27ce429 21px 22px),repeating-linear-gradient(90deg,transparent 0 20px,#b27ce429 21px 22px),#21142e}
 [data-background="orbits"]{background:radial-gradient(ellipse at 50% 45%,#392047 0 40%,transparent 70%),repeating-radial-gradient(ellipse at 52% 80%,#241431 0 16%,#79569272 16.2% 16.5%,#241431 17% 24%)}
-[data-background="forge"]{background:radial-gradient(ellipse at 48% 42%,#462850 0 30%,transparent 70%),repeating-linear-gradient(132deg,#241b2e 0 28%,#a967af7d 28.2% 28.6%,#2b1d34 29% 34%)}
-.background-swatch[data-background="aura"]{background:radial-gradient(ellipse,#775498,transparent 72%),#241632}
-.buddy-stage[data-background]:not([data-background="aura"])::before{content:none}
+[data-background="forge"]{background:radial-gradient(ellipse at 48% 42%,#462850 0 25%,transparent 72%),linear-gradient(133deg,#2b1d34 0 27%,#a967af 27.5% 28%,#31213d 28.5% 66%,#9059a5 66.5% 67%,#24182e 67.5%)}
+[data-background="aura"]{background:radial-gradient(ellipse,#775498,transparent 72%),#241632}
+.buddy-stage[data-background]:not([data-background="aura"],[data-background="default"])::before{content:none}
 .background-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.background-card{display:grid;gap:7px;border:1px solid #4e355e;border-radius:11px;padding:9px}
-.background-swatch{width:100%;aspect-ratio:2;border:1px solid #604673;border-radius:8px}
-.background-swatch[aria-pressed="true"]{outline:2px solid #c789ff}
+.background-card{display:grid;gap:7px;min-width:0;border:1px solid #4e355e;border-radius:11px;padding:9px}
+.background-swatch{display:block;width:100%;min-width:0;aspect-ratio:2;padding:0;overflow:hidden;background-clip:padding-box;border:1px solid #604673;border-radius:8px}
+.background-swatch[aria-pressed="true"]{border-color:#c789ff;box-shadow:inset 0 0 0 1px #c789ff}
 .style-slots{display:grid;gap:8px}
 .style-slots article{display:grid;gap:6px}
 .share-card-preview{display:block;width:100%;max-height:min(56dvh,520px);object-fit:contain;border-radius:10px}
