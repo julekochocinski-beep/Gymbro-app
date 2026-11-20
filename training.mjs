@@ -181,6 +181,18 @@ export function previousBest(sessions, label) {
   return best;
 }
 
+export function weightMilestone(sessions, draft, label, kg, announced = 0) {
+  const draftBest=previousBest([draft],label);
+  if(!(kg>Math.max(draftBest,announced))) return null;
+
+  const best=Math.max(draftBest,previousBest(sessions,label));
+  if(best>0&&kg>best) return {kind:'pr',previous:best};
+
+  const last=exerciseHistory(sessions,label)[0];
+  const previous=Math.max(0,...(last?.sets??[]).map(set=>Number(set.kg)).filter(Number.isFinite));
+  return previous>0&&kg>previous?{kind:'last-session',previous}:null;
+}
+
 export function completedBest(sessions,{onlyReps}={}){
   const best=new Map();
   for(const session of sessions){

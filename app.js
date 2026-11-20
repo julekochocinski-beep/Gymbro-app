@@ -4,9 +4,9 @@ import {lifts,liftResults,clanProfile,workoutRecord,workoutActivities,clanReques
 import {models,modelFor} from './models.mjs';
 import {items,wardrobeFrom,legacyProgress,progression,buyItem,toggleItem,toggleTattoo,XP_PER_DAY,XP_PER_RECORD,COINS_PER_LEVEL} from './gymbro.mjs';
 import {placeTattoo,tattooAreas,tattooFits,tattooFrame,tattooInks,tattooSlots} from './tattoos.mjs';
-import {plans,muscles,standard,example,normalize,weightsFor,completedCount,newDraft,blankSet,newId,previousBest,exerciseHistory,numberedCompletedSets,exerciseConfig,MAX_PLAN_SETS,MAX_PLAN_REPS,elapsedSeconds,remainingSeconds,timeLabel,statsFor,dayKey,weekKeys,recentSessions} from './training.mjs';
+import {plans,muscles,standard,example,normalize,weightsFor,completedCount,newDraft,blankSet,newId,weightMilestone,exerciseHistory,numberedCompletedSets,exerciseConfig,MAX_PLAN_SETS,MAX_PLAN_REPS,elapsedSeconds,remainingSeconds,timeLabel,statsFor,dayKey,weekKeys,recentSessions} from './training.mjs';
 
-import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,exerciseTechnique,matchesExercise} from './catalog.mjs';
+import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,exerciseTechnique,hasMachineSettings,isBodyweightExercise,matchesExercise} from './catalog.mjs';
 import {estimateOneRepMax,filterSessions,monthGrid,moveMonth} from './progress.mjs';
 import {previewFrames} from './exercise-preview.mjs';
 import {armRestSound,playRestSignal} from './rest-signal.mjs';
@@ -596,17 +596,25 @@ function repTarget(exercise){
   const reps=exercise.repMin===exercise.repMax?exercise.repMin:exercise.repMin+'–'+exercise.repMax;
   return '<p class="rep-target">'+t('Cel:')+' '+esc(reps)+' '+t('powt. na serię')+'</p>';
 }
-function exerciseCard(exercise,i){
+function previousSetsByNumber(label){
+  const previous=exerciseHistory(data.sessions,label)[0]?.sets??[];
+  return new Map(previous.map(set=>[set.number,set]));
+}
+function exerciseCard(exercise,i,notes){
   const label=esc(exerciseLabel(exercise.label));
-  const previous=exerciseHistory(data.sessions,exercise.label)[0]?.sets??[];
-  const previousByNumber=new Map(previous.map(set=>[set.number,set]));
+  const key=exerciseKey(exercise.label);
+  const workoutId=data.draft.id;
+  const previousByNumber=previousSetsByNumber(exercise.label);
   return '<section class="card exercise"><div class="card-head"><div><div class="exercise-title"><h3>'+
     '<button type="button" class="exercise-history-trigger" data-act="exercise-history" data-ex="'+i+'" aria-haspopup="dialog" aria-label="'+label+' · '+t('Historia ćwiczenia')+'">'+
     label+icon('calendar')+'</button></h3>'+techniqueButton(exercise.label)+'</div>'+
     '<p class="meta">'+(weightsFor(exercise.label,data.custom)?t('Serii:')+' '+exercise.sets.filter(s=>s.done).length:t('Bez przypisanej partii mięśni'))+'</p></div>'+
     '<button type="button" class="btn ghost" data-act="remove-exercise" data-ex="'+i+'" aria-label="'+t('Usuń ćwiczenie')+' '+esc(exerciseLabel(exercise.label))+'">'+icon('x')+'</button></div>'+restSetting(exercise,i,'workout')+repTarget(exercise)+
     '<div class="set-list">'+exercise.sets.map((s,j)=>setRow(s,i,j,previousByNumber.get(j+1))).join('')+'</div>'+
-    '<button type="button" class="btn ghost add-set" data-act="add-set" data-ex="'+i+'">'+icon('plus')+' '+t('Dodaj serię')+'</button></section>';
+    '<div class="controls"><button type="button" class="btn ghost add-set" data-act="add-set" data-ex="'+i+'">'+icon('plus')+' '+t('Dodaj serię')+'</button>'+
+    (exercise.sets.some(set=>!set.done)?'<button type="button" class="btn ghost" data-act="replace-exercise" data-ex="'+i+'">'+t('Zamień na dziś')+'</button>':'')+'</div>'+
+    journalBlock('exercise',workoutId,notes.exercises?.[key],i)+
+    (hasMachineSettings(exercise.label)?journalBlock('machine',workoutId,readJournal('machine',key).note,i):'')+'</section>';
 }
 function planRows(){
   if(!data.savedPlans.length) return '<p class="meta">'+t('Zapisz własną listę ćwiczeń, żeby uruchamiać ją na kolejnych treningach.')+'</p>';
@@ -645,10 +653,12 @@ function showTraining(){
       '<div class="template-group"><button type="button" class="template" data-act="start" data-key="'+name+'">'+icon('dumbbell')+'<b>'+name+'</b><span class="meta">'+exercises.length+' '+t('ćwiczenia')+'</span></button>'+
       '<button type="button" class="btn ghost template-config" data-act="configure-template" data-key="'+name+'" aria-label="'+t('Ustaw serie i powtórzenia:')+' '+name+'">'+icon('edit')+' '+t('Ustaw')+'</button></div>').join('')+'</div></section></div>';
   const count=completedCount(draft);
+  const notes=readJournal('workout',draft.id);
   return '<div class="training-main">'+heading(esc(draft.name),t('Wpisz ciężar i powtórzenia, potem odhacz wykonaną serię.'),action(t('Zmień nazwę'),'rename-draft','ghost rename','edit'))+'<div class="stack">'+
     '<section class="card card-pad session-hdr"><div class="card-head"><div><span class="eyebrow">'+t('Czas treningu')+'</span><div class="workout-clock" aria-label="'+t('Czas treningu')+'" data-elapsed></div><p class="meta">'+t('Ukończone serie:')+' '+count+'</p></div>'+
-    '<button class="btn primary" type="button" data-act="finish" '+(!count?'disabled':'')+'>'+icon('check')+' '+t('Zakończ')+'</button></div>'+workoutPhotoImage()+workoutPhotoButton(draft.id)+'</section>'+
-    draft.exercises.map(exerciseCard).join('')+
+    '<button class="btn primary" type="button" data-act="finish" '+(!count?'disabled':'')+'>'+icon('check')+' '+t('Zakończ')+'</button></div>'+workoutPhotoImage()+workoutPhotoButton(draft.id)+
+    journalBlock('workout',draft.id,notes.note,undefined,notes.withFriend)+'</section>'+
+    draft.exercises.map((exercise,i)=>exerciseCard(exercise,i,notes)).join('')+
     action(t('Dodaj ćwiczenia'),'workout-picker','primary full','plus')+
     (draft.exercises.length?action(t('Zapisz jako plan'),'plan-from-workout','ghost full'):'')+
     action(t('Porzuć trening'),'discard','danger')+'</div></div>';
@@ -1259,12 +1269,68 @@ function refreshDraftPhoto(){
     if(draftPhotoPreview===preview) draftPhotoPreview=null;
   });
 }
-function workoutForPhoto(id){
+function findWorkout(id){
   return data.draft?.id===id?data.draft:data.sessions.find(session=>session.id===id);
+}
+const journalTitles={workout:'Notatka treningu',exercise:'Notatka ćwiczenia',machine:'Ustawienia maszyny'};
+function journalKey(kind,id){
+  return 'gymbro-journal-v1:'+JSON.stringify([currentUser?.id??null,kind,id]);
+}
+function readJournal(kind,id){
+  try{return JSON.parse(localStorage.getItem(journalKey(kind,id)))??{};}
+  catch{return {};}
+}
+function journalBlock(kind,id,note,index,withFriend=false){
+  return '<div class="journal-block"><button type="button" class="btn ghost journal-edit" data-act="workout-journal" data-key="'+esc(id)+
+    '" data-kind="'+kind+'"'+(index===undefined?'':' data-ex="'+index+'"')+' aria-haspopup="dialog">'+icon('edit')+' '+t(journalTitles[kind])+'</button>'+
+    (withFriend?'<span class="journal-partner">'+icon('clan')+' '+t('Trening ze znajomym')+'</span>':'')+
+    (note?'<p>'+esc(note)+'</p>':'')+'</div>';
+}
+function journalEditor(kind,id,index){
+  const workout=findWorkout(id);
+  const exercise=workout?.exercises[Number(index)];
+  if(!workout||!Object.hasOwn(journalTitles,kind)||(kind!=='workout'&&!exercise)) return;
+  if(kind==='machine'&&!hasMachineSettings(exercise.label)) return;
+  const key=exercise?exerciseKey(exercise.label):null;
+  const info=readJournal(kind==='machine'?'machine':'workout',kind==='machine'?key:id);
+  const note=kind==='exercise'?info.exercises?.[key]:info.note;
+  const partner=kind==='workout'?'<label class="journal-friend"><input type="checkbox" name="with-friend"'+
+    (info.withFriend?' checked':'')+'> '+t('Trening ze znajomym')+'</label>':'';
+  const placeholder=kind==='machine'?' placeholder="'+t('Np. siedzisko 4, oparcie 2, szeroki chwyt')+'"':'';
+  const back=workout===data.draft?action(t('Wróć'),'close','ghost full'):friendButton('details',id,t('Wróć do treningu'));
+  openModal(t(journalTitles[kind]),'<form id="workout-journal" class="stack" data-kind="'+kind+'" data-key="'+esc(id)+'"'+
+    (exercise?' data-ex="'+index+'"':'')+'><p class="meta">'+(exercise?esc(exerciseLabel(exercise.label)):esc(workout.name))+'</p>'+
+    '<label class="field">'+t(journalTitles[kind])+'<textarea name="note" rows="3" maxlength="600"'+placeholder+'>'+esc(note??'')+'</textarea></label>'+
+    partner+'<p class="meta">'+t('Prywatne · zapis na tym urządzeniu')+'</p><p class="form-error" role="alert" hidden></p>'+
+    '<button type="submit" class="btn primary full">'+t('Zapisz')+'</button>'+back+'</form>');
+}
+function saveJournal(form,fields){
+  const {kind,key:id,ex}=form.dataset;
+  const workout=findWorkout(id);
+  const exercise=workout?.exercises[Number(ex)];
+  if(!workout||!Object.hasOwn(journalTitles,kind)||(kind!=='workout'&&!exercise)) return;
+  if(kind==='machine'&&!hasMachineSettings(exercise.label)) return;
+  const key=exercise?exerciseKey(exercise.label):null;
+  const note=String(fields.get('note')??'').trim().slice(0,600);
+  const area=kind==='machine'?'machine':'workout';
+  const entry=area==='machine'?key:id;
+  const info=readJournal(area,entry);
+  if(kind==='exercise') info.exercises={...info.exercises,[key]:note};
+  else info.note=note;
+  if(kind==='workout') info.withFriend=fields.has('with-friend');
+  try{localStorage.setItem(journalKey(area,entry),JSON.stringify(info));}
+  catch{
+    const error=form.querySelector('.form-error');
+    error.textContent=t('Nie udało się zapisać notatki na tym urządzeniu.');
+    error.hidden=false;
+    return;
+  }
+  if(workout===data.draft){dialog.close();render();}
+  else details(id);
 }
 function openPhotoEditor(id){
   const avatar=id===undefined;
-  const workout=avatar?null:workoutForPhoto(id);
+  const workout=avatar?null:findWorkout(id);
   if(!avatar&&!workout) return;
   const finished=Boolean(workout?.finished);
   const hasPhoto=avatar&&Boolean(profilePhoto);
@@ -1319,7 +1385,7 @@ async function persistWorkoutPhoto(form,id,file,remove,visibility){
   const photo=file?.size?await preparePhoto(file):
     currentShare?await fetchSharedWorkoutPhoto(currentShare):await readWorkoutPhoto(id);
   if(!photo) throw Error(t('Wybierz prawidłowe zdjęcie.'));
-  if(!workoutForPhoto(id)) return;
+  if(!findWorkout(id)) return;
   await saveWorkoutPhoto(id,photo);
   if(canShare&&visibility==='private') await setWorkoutPhotoShare(id,null);
   if(canShare&&visibility==='public'&&(!currentShare||file?.size)) await setWorkoutPhotoShare(id,photo);
@@ -1345,7 +1411,7 @@ async function submitPhoto(form,file,remove,visibility){
       renderAccount();
       updateSettingsPhoto();
       if(route()==='klan') refreshSocialTab();
-    }else if(workoutForPhoto(id)){
+    }else if(findWorkout(id)){
       await persistWorkoutPhoto(form,id,file,remove,visibility);
       if(data.draft?.id===id){
         draftPhotoPreview=null;
@@ -1369,8 +1435,14 @@ async function submitPhoto(form,file,remove,visibility){
 function details(id){
   const session=data.sessions.find(s=>s.id===id);
   if(!session) return;
-  const lines=session.exercises.filter(e=>e.sets.some(s=>s.done)).map(e=>'<div><h3>'+esc(exerciseLabel(e.label))+'</h3><p class="meta">'+e.sets.filter(s=>s.done).map(s=>esc(s.kg)+' kg × '+esc(s.reps)).join(' · ')+'</p></div>').join('');
-  openModal(esc(session.name),'<p class="meta">'+formatter.format(session.finished)+' '+t('· Serii:')+' '+completedCount(session)+' '+t('· Czas:')+' '+timeLabel(elapsedSeconds(session.started,session.finished),true)+'</p>'+workoutPhotoImage()+'<p class="meta workout-photo-visibility" hidden></p>'+workoutPhotoButton(id)+lines+
+  const notes=readJournal('workout',id);
+  const lines=session.exercises.map((e,i)=>{
+    const sets=e.sets.filter(s=>s.done);
+    return sets.length?'<div><h3>'+esc(exerciseLabel(e.label))+'</h3><p class="meta">'+sets.map(s=>esc(s.kg)+' kg × '+esc(s.reps)).join(' · ')+'</p>'+
+      journalBlock('exercise',id,notes.exercises?.[exerciseKey(e.label)],i)+'</div>':'';
+  }).join('');
+  openModal(esc(session.name),'<p class="meta">'+formatter.format(session.finished)+' '+t('· Serii:')+' '+completedCount(session)+' '+t('· Czas:')+' '+timeLabel(elapsedSeconds(session.started,session.finished),true)+'</p>'+workoutPhotoImage()+'<p class="meta workout-photo-visibility" hidden></p>'+workoutPhotoButton(id)+
+    journalBlock('workout',id,notes.note,undefined,notes.withFriend)+lines+
     '<button type="button" class="btn ghost" data-act="rename-session" data-key="'+esc(id)+'">'+icon('edit')+' '+t('Zmień nazwę')+'</button>'+
     '<button type="button" class="btn primary" data-act="session-map" data-key="'+esc(id)+'">'+t('Pokaż mapę')+' '+icon('arrow')+'</button>');
   const image=dialog.querySelector('.workout-photo');
@@ -1423,19 +1495,21 @@ function submitPlan(form,operation){
   save();render();
   if(storageOK) toast(t('Plan zapisany w sekcji Moje plany.'));
 }
-function openPicker(target){
+function openPicker(target,index){
+  const original=target==='replace'?data.draft?.exercises[index]:null;
+  if(target==='replace'&&!original?.sets.some(set=>!set.done)) return;
   const labels=(target==='plan'?planEdit.exercises:data.draft.exercises).map(e=>e.label);
-  picker={target,category:'all',existing:new Set(labels.map(exerciseKey)),chosen:new Map()};
+  picker={target,index,original,category:'all',existing:new Set(labels.map(exerciseKey)),chosen:new Map()};
   showPicker();
 }
 function showPicker(){
-  openModal(t('Dodaj ćwiczenia'),
+  openModal(t(picker.target==='replace'?'Zamień ćwiczenie':'Dodaj ćwiczenia'),
     '<label class="catalog-search">'+icon('search')+'<input type="search" enterkeyhint="search" id="catalog-query" aria-label="'+t('Szukaj ćwiczeń')+'" placeholder="'+t('Szukaj ćwiczeń')+'"></label>'+
     '<div class="catalog-chips" aria-label="'+t('Partia mięśni')+'">'+[['all',t('Wszystkie')],...categories,['wlasne',t('Własne')]].map(([key,label])=>
       '<button type="button" data-act="catalog-filter" data-key="'+key+'" aria-pressed="'+(key===picker.category)+'">'+t(label)+'</button>').join('')+'</div>'+
     '<div class="catalog-scroll" id="catalog-list"></div>'+
     '<div class="catalog-footer">'+action(t('Wpisz własne ćwiczenie'),'catalog-custom','ghost full','plus')+
-    '<button type="button" class="btn primary full" data-act="catalog-apply" disabled>'+t('Dodaj wybrane')+'</button></div>',{sheet:true});
+    '<button type="button" class="btn primary full" data-act="catalog-apply" disabled></button></div>',{sheet:true});
   drawCatalog();
 }
 function catalogThumb(label){
@@ -1470,6 +1544,7 @@ function saveOwnExercise(form,fields){
   data.custom={...data.custom,['own:'+key]:Object.fromEntries(parts.map(muscle=>[muscle,1]))};
   data.ownExercises.push({label,group:'wlasne',equipment:'Własne',technique:fields.get('technique').trim()});
   save();
+  if(picker.target==='replace') picker.chosen.clear();
   if(!picker.existing.has(key)) picker.chosen.set(key,label);
   picker.category='wlasne';
   showPicker();
@@ -1492,12 +1567,28 @@ function drawCatalog(resetScroll=false){
   if(resetScroll) list.scrollTop=0;
   const submit=dialog.querySelector('[data-act="catalog-apply"]');
   submit.disabled=!picker.chosen.size;
-  submit.textContent=picker.chosen.size?t('Dodaj wybrane (')+picker.chosen.size+')':t('Dodaj wybrane');
+  submit.textContent=picker.target==='replace'?t('Zamień na dziś'):
+    picker.chosen.size?t('Dodaj wybrane (')+picker.chosen.size+')':t('Dodaj wybrane');
 }
 function applyPicker(){
   const labels=[...picker.chosen.values()];
   if(!labels.length) return;
   if(picker.target==='plan') planEdit.exercises.push(...labels.map(exerciseConfig));
+  else if(picker.target==='replace'){
+    const {index,original}=picker;
+    if(data.draft?.exercises[index]!==original) return;
+    const completed=numberedCompletedSets(original.sets);
+    const remaining=original.sets.length-completed.length;
+    if(!remaining) return;
+    const config=exerciseConfig({...original,label:labels[0],setCount:remaining});
+    const replacement={...config,sets:Array.from({length:remaining},blankSet)};
+    const exercises=completed.length?[{...original,setCount:completed.length,sets:completed},replacement]:[replacement];
+    data.draft.exercises.splice(index,1,...exercises);
+    save();
+    dialog.close();render();
+    document.querySelectorAll('.exercise')[index+exercises.length-1]?.scrollIntoView({block:'start'});
+    return;
+  }
   else {
     data.draft.exercises.push(...labels.map(label=>({...exerciseConfig(label),sets:[blankSet()]})));
     save();
@@ -1582,15 +1673,15 @@ function renameWorkout(session){
     '<button class="btn primary full" type="submit">'+t('Zapisz nazwę')+'</button></form>');
 }
 
-function recordContent(label,kg,previous){
+function recordContent(label,kg,previous,kind='pr'){
   return '<div class="pr-emblem" aria-hidden="true">'+icon('dumbbell')+'<i></i><i></i><i></i></div>'+
-    '<div class="pr-copy"><span>'+t('NOWY PR')+'</span><strong>'+formatKg.format(kg)+' kg</strong><p>'+esc(exerciseLabel(label))+' '+t('· poprzednio')+' '+formatKg.format(previous)+' kg</p></div>';
+    '<div class="pr-copy"><span>'+t(kind==='last-session'?'MOCNIEJ NIŻ OSTATNIO':'NOWY PR')+'</span><strong>'+formatKg.format(kg)+' kg</strong><p>'+esc(exerciseLabel(label))+' '+t('· poprzednio')+' '+formatKg.format(previous)+' kg</p></div>';
 }
-function showRecord(label,kg,previous){
+function showRecord(label,kg,previous,kind){
   const el=document.querySelector('#record');
   clearTimeout(recordTimeout);
   el.classList.remove('visible');
-  el.innerHTML=recordContent(label,kg,previous);
+  el.innerHTML=recordContent(label,kg,previous,kind);
   el.classList.add('visible');
   recordTimeout=setTimeout(()=>el.classList.remove('visible'),4600);
 }
@@ -1603,23 +1694,25 @@ function updateSet(input){
 function toggleSet(exercise,set,button){
   let record;
   if(!set.done){
-    const kg=set.kg.trim().replace(',','.');
-    const reps=set.reps.trim();
-    if(!/^\d+$/.test(reps)||Number(reps)<1|| (kg && (!/^\d+(\.\d+)?$/.test(kg)||!Number.isFinite(Number(kg))))){
+    const enteredKg=String(set.kg??'').trim();
+    const enteredReps=String(set.reps??'').trim();
+    const previous=enteredKg&&enteredReps?null:previousSetsByNumber(exercise.label).get(Number(button.dataset.set)+1);
+    const kg=String(enteredKg||(previous?.kg??(isBodyweightExercise(exercise.label)?'0':''))).replace(',','.');
+    const reps=String(enteredReps||(previous?.reps??''));
+    const validReps=/^\d+$/.test(reps)&&Number.isSafeInteger(Number(reps))&&Number(reps)>0;
+    const validKg=/^\d+(\.\d+)?$/.test(kg)&&Number.isFinite(Number(kg));
+    if(!validReps||!validKg){
       toast(t('Podaj poprawny ciężar i co najmniej jedno powtórzenie.'));
-      button.closest('.set-row').querySelector(!/^\d+$/.test(reps)||Number(reps)<1?'[data-field="reps"]':'[data-field="kg"]').focus();
+      button.closest('.set-row').querySelector(!validKg?'[data-field="kg"]':'[data-field="reps"]').focus();
       return;
     }
-    set.kg=kg||'0';
+    set.kg=kg;
     set.reps=String(Number(reps));
     const key=exerciseKey(exercise.label);
-    const best=previousBest([...data.sessions,data.draft],exercise.label);
     const seen=data.draft.announcedRecords;
     const announced=seen&&Object.hasOwn(seen,key)?seen[key]:0;
-    if(best>0&&Number(set.kg)>Math.max(best,announced)){
-      record={label:exercise.label,kg:Number(set.kg),best};
-      data.draft.announcedRecords={...seen,[key]:record.kg};
-    }
+    record=weightMilestone(data.sessions,data.draft,exercise.label,Number(set.kg),announced);
+    if(record) data.draft.announcedRecords={...seen,[key]:Number(set.kg)};
   }
   set.done=!set.done;
   if(!set.done) cancelRestForSet(set);
@@ -1632,7 +1725,7 @@ function toggleSet(exercise,set,button){
     }
   }
   save();render();
-  if(record) showRecord(record.label,record.kg,record.best);
+  if(record) showRecord(exercise.label,Number(set.kg),record.previous,record.kind);
 }
 function finish(){
   const draft=data.draft;
@@ -1767,6 +1860,7 @@ document.addEventListener('submit',async event=>{
   }
   if(form.id==='nickname-form') submitNickname(form,event.submitter,fields.get('nick'));
   if(form.id==='photo-form') submitPhoto(form,fields.get('photo'),event.submitter?.value==='remove',fields.get('visibility'));
+  if(form.id==='workout-journal') saveJournal(form,fields);
   if(form.id==='friends-setup') modifyFriends({action:'setup'},event.submitter);
   if(form.id==='friends-invite') modifyFriends({action:'invite',code:fields.get('code')},event.submitter)
     .then(sent=>{if(sent){form.reset();toast(t('Zaproszenie wysłane'));}});
@@ -2013,6 +2107,7 @@ document.addEventListener('click',async event=>{
     case 'plan-remove-exercise':planEdit.exercises.splice(Number(ex),1);render();break;
     case 'plan-picker':openPicker('plan');break;
     case 'workout-picker':openPicker('workout');break;
+    case 'replace-exercise':openPicker('replace',Number(ex));break;
     case 'catalog-filter':
       picker.category=key;
       for(const chip of dialog.querySelectorAll('[data-act="catalog-filter"]')) chip.setAttribute('aria-pressed',String(chip===button));
@@ -2023,7 +2118,10 @@ document.addEventListener('click',async event=>{
       const labelKey=exerciseKey(item.label);
       if(picker.existing.has(labelKey)) break;
       if(picker.chosen.has(labelKey)) picker.chosen.delete(labelKey);
-      else picker.chosen.set(labelKey,item.label);
+      else {
+        if(picker.target==='replace') picker.chosen.clear();
+        picker.chosen.set(labelKey,item.label);
+      }
       drawCatalog();
       dialog.querySelector('[data-act="catalog-toggle"][data-key="'+key+'"]')?.focus({preventScroll:true});
       break;
@@ -2038,6 +2136,7 @@ document.addEventListener('click',async event=>{
       break;
     case 'rename-draft':renameWorkout(data.draft);break;
     case 'rename-session':renameWorkout(data.sessions.find(s=>s.id===key));break;
+    case 'workout-journal':journalEditor(button.dataset.kind,key,ex);break;
     case 'rest-settings':openRestSettings(key,Number(ex));break;
     case 'rest-preset':{
       const form=dialog.querySelector('#rest-form');
@@ -2072,7 +2171,10 @@ document.addEventListener('click',async event=>{
     case 'confirm-finish': finish();break;
     case 'discard':confirmModal(t('Porzucić trening?'),t('Serie z tego treningu zostaną usunięte.'),'confirm-discard',t('Porzuć trening'));break;
     case 'confirm-discard':
-      if(data.draft) saveWorkoutPhoto(data.draft.id,null).catch(()=>{});
+      if(data.draft){
+        saveWorkoutPhoto(data.draft.id,null).catch(()=>{});
+        try{localStorage.removeItem(journalKey('workout',data.draft.id));}catch{/* The draft can still be discarded. */}
+      }
       data.draft=null;save();dialog.close();render();break;
   }
 });

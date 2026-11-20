@@ -176,6 +176,9 @@ export const catalogWeights=new Map(catalog.filter(item=>item.weights).map(item=
 const catalogNames=new Map(catalog.flatMap(item=>[item.label,item.display,...item.aliases,englishExercises[item.label][0]].map(name=>[normalize(name),item])));
 export const exerciseKey = name => normalize(catalogNames.get(normalize(name))?.label??name);
 export const exerciseLabel = name => catalogNames.get(normalize(name))?.display??name;
+const machineEquipment=new Set(['Maszyna','Wyciąg','Suwnica Smitha']);
+export const hasMachineSettings = name => machineEquipment.has(catalogNames.get(normalize(name))?.equipment);
+export const isBodyweightExercise = name => catalogNames.get(normalize(name))?.equipment==='Masa ciała';
 export function localizedExerciseLabel(name){
   const item=catalogNames.get(normalize(name));
   if(!item) return name;

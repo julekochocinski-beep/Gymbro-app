@@ -318,6 +318,14 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .custom-muscles{min-width:0;margin:0;padding:9px 10px;border:1px solid #4a335a;border-radius:10px}
 .custom-muscles legend{color:#e7ccfa;font-size:13px;padding:0 5px}
 .field textarea{font:inherit;font-size:16px;resize:vertical;color:var(--text);background:#140f1b;border:1px solid #4a3b57;border-radius:8px;padding:8px 10px;min-width:0}
+.journal-block{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px}
+.journal-block .journal-edit{min-height:38px;padding:6px 9px;font-size:12px}
+.journal-block p{flex:0 0 100%;color:var(--muted);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.exercise .journal-block p,.session-hdr .journal-block p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.journal-partner,.journal-friend{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+.journal-partner svg{width:16px;height:16px}
+.journal-friend{min-height:44px}
+.journal-friend input{width:20px;min-height:20px;accent-color:var(--accent)}
 .form-error{color:#ffadc1;font-size:13px}
 .rest-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:0 10px 10px}
 .rest-actions .btn{min-height:39px;font-size:13px;padding:5px 7px}
