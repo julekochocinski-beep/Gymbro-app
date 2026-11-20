@@ -1,8 +1,7 @@
 import { supabase } from './supabase.mjs';
 import {t,setLanguage,uiLocale} from './locale.mjs';
 import {lifts,liftResults,clanProfile,workoutRecord,workoutActivities,clanRequest,friendsRequest,profileRequest} from './clans.mjs';
-import {layout} from './assets/layout.js';
-import {muscleTargets} from './assets/muscle-targets.mjs';
+import {models,modelFor} from './models.mjs';
 import {items,wardrobeFrom,legacyProgress,progression,buyItem,toggleItem,XP_PER_DAY,XP_PER_RECORD,COINS_PER_LEVEL} from './gymbro.mjs';
 import {plans,muscles,standard,example,normalize,weightsFor,completedCount,newDraft,blankSet,newId,previousBest,exerciseHistory,numberedCompletedSets,exerciseConfig,MAX_PLAN_SETS,MAX_PLAN_REPS,elapsedSeconds,remainingSeconds,timeLabel,statsFor,dayKey,weekKeys,recentSessions} from './training.mjs';
 
@@ -153,6 +152,7 @@ const route=()=>Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(
 
 function preferredSide(session){
   if(!session) return 'przod';
+  const {layout}=activeModel();
   const {map}=statsFor([session],data.custom,data.threshold);
   const total=side=>Object.keys(layout[side].warstwy).reduce((sum,key)=>sum+(map[key]?.weighted??0),0);
   return total('tyl')>total('przod')?'tyl':'przod';
@@ -179,6 +179,7 @@ function modelMotionStyle(){
   return '--breath-delay:-'+(elapsed%4200).toFixed(0)+'ms;--aura-delay:-'+(elapsed%5600).toFixed(0)+'ms';
 }
 function stage(context){
+  const {layout,targets:hitAreas,root,id}=activeModel();
   const shape=layout[side];
   const [w,h]=shape.plotno;
   const part=side==='przod'?t('Przód'):t('Tył');
@@ -186,14 +187,14 @@ function stage(context){
     const value=intensity(context,key);
     const opacity=.25+.75*value;
     return '<img class="glow" data-glow="'+key+'" style="--opacity:'+opacity+'" '+(!value?'hidden':'')+' src="'+layer.plik+'" alt="" draggable="false">'+
-      (value?'<img class="muscle-sparks" src="'+layer.plik.replace('assets/','assets/sparks/')+'" style="--spark:'+opacity*.8+'" alt="" draggable="false">':'');
+      (value?'<img class="muscle-sparks" src="'+root+'sparks/'+layer.plik.slice(root.length)+'" style="--spark:'+opacity*.8+'" alt="" draggable="false">':'');
   }).join('');
   const targets='<svg class="muscle-targets" viewBox="0 0 '+w+' '+h+'" aria-label="'+t('Wybierz partię na postaci')+'">'+
     Object.entries(shape.warstwy).map(([key,layer])=>
       '<g role="button" tabindex="0" data-act="muscle" data-key="'+key+'" aria-label="'+esc(t(layer.nazwa))+'">'+
-      '<path fill-rule="evenodd" d="'+muscleTargets[side][key]+'"></path></g>').join('')+'</svg>';
+      '<path fill-rule="evenodd" d="'+hitAreas[side][key]+'"></path></g>').join('')+'</svg>';
   return '<div class="map-stage"><span class="stage-tag">'+(context.demo?t('Dane przykładowe'):(context.latest?'GymBro':t('Brak treningów')))+'</span>'+
-    '<div class="figure" style="aspect-ratio:'+w+'/'+h+'"><img src="assets/'+side+'_baza.webp" alt="GymBro — '+part+'" draggable="false"><img src="assets/'+side+'_kontury.webp" alt="" draggable="false">'+layers+targets+'</div>'+
+    '<div class="figure" data-model="'+id+'" style="aspect-ratio:'+w+'/'+h+'"><img src="'+root+side+'_baza.webp" alt="GymBro — '+part+'" draggable="false"><img src="'+root+side+'_kontury.webp" alt="" draggable="false">'+layers+targets+'</div>'+
     '<span class="stage-axis">'+part+'</span></div>';
 }
 function mapCard(context){
@@ -264,6 +265,7 @@ const skinName=skin=>data.language==='en'?skin.en:skin.name;
 const levelText=level=>t('Poziom')+' '+level;
 const skinLevel=()=>data.skinPreview===null?currentProgress().level:skinTestLevel;
 const activeSkin=()=>data.skinPreview??unlockedSkin(data.wardrobe.skin,currentProgress().level);
+function activeModel(){return modelFor(data.wardrobe.model);}
 function skinTestBadge(){
   return data.skinPreview===null?'':'<p class="skin-test-badge">'+t('Tryb testowy')+' · '+levelText(skinTestLevel)+'</p>';
 }
@@ -281,16 +283,16 @@ function tenureText(months){
   if(!months) return t('Staż krótszy niż miesiąc');
   return tenureDuration(months)+' '+t('stażu');
 }
-function buddyModel(view,preview=null,shine=null,{worn=data.wardrobe.worn,skin=activeSkin()}={}){
-  const [width,height]=layout[view].plotno;
-  const description=view==='przod'?t('GymBro od przodu'):t('GymBro od tyłu');
+function buddyModel(view,preview=null,shine=null,{worn=data.wardrobe.worn,skin=activeSkin(),model=activeModel()}={}){
+  const [width,height]=model.layout[view].plotno;
+  const description=t(model.name)+' · '+t(view==='przod'?'Przód':'Tył');
   const visible=items.filter(item=>(worn.includes(item.id)||preview===item.id)&&(view==='przod'||item.back));
-  const asset='assets/ubrania/'+view+'-';
+  const asset=model.root+'ubrania/'+view+'-';
   const glint=visible.some(item=>item.id===shine)?
     '<span class="outfit-glint" aria-hidden="true" style="--outfit-mask:url('+asset+shine+'.webp)"></span>':'';
   const base=asset+'baza.webp';
   const finish=skin==='default'?'':'<span class="buddy-finish" style="--buddy-art:url('+base+')" aria-hidden="true"></span>';
-  return '<div class="buddy-figure" data-skin="'+esc(skin)+'" style="aspect-ratio:'+width+'/'+height+'"><img class="buddy-base" src="'+base+'" alt="'+description+'" draggable="false">'+finish+
+  return '<div class="buddy-figure" data-model="'+model.id+'" data-skin="'+esc(skin)+'" style="aspect-ratio:'+width+'/'+height+'"><img class="buddy-base" src="'+base+'" alt="'+description+'" draggable="false">'+finish+
     visible.map(item=>'<img src="'+asset+item.id+'.webp" data-worn="'+item.id+'" alt="'+t(item.name)+'" draggable="false">').join('')+glint+'</div>';
 }
 function homeBuddy(){
@@ -306,7 +308,7 @@ function wardrobeItem(item,coins){
   const wearing=worn.includes(item.id);
   const trying=tryOn===item.id;
   const attr=' type="button" data-key="'+item.id+'"';
-  return '<article class="outfit-row"><div class="outfit-thumb"><img src="assets/ubrania/produkt-'+item.id+'.webp" alt=""></div>'+
+  return '<article class="outfit-row"><div class="outfit-thumb"><img src="'+activeModel().root+'ubrania/produkt-'+item.id+'.webp" alt=""></div>'+
     '<div class="outfit-description"><h3>'+t(item.name)+'</h3><span class="meta">'+t(item.slot)+(wearing?' '+t('· Założone'):fits?' '+t('· Kupione'):'')+'</span>'+
     '<div class="outfit-actions">'+(fits?'<button class="btn ghost" data-act="outfit-toggle"'+attr+' aria-label="'+(wearing?t('Zdejmij')+' ':t('Załóż')+' ')+t(item.name)+'">'+(wearing?t('Zdejmij'):t('Załóż'))+'</button>':
       '<button class="btn ghost" data-act="outfit-try"'+attr+' aria-pressed="'+trying+'" aria-label="'+t('Przymierz:')+' '+t(item.name)+'">'+(trying?t('Zakończ podgląd'):t('Przymierz'))+'</button>'+
@@ -338,6 +340,7 @@ function showGymBro(shine){
   return heading(t('Twój')+' <em>GymBro</em>',t('Personalizuj postać i odblokowuj ubranka za monety.'))+
     '<div class="stack"><section class="card card-pad buddy-card"><div class="card-head">'+
     segment(t('Widok GymBro'),avatarSide,[['przod',t('Przód')],['tyl',t('Tył')]],'avatar-side')+coinBalance(player.coins)+'</div>'+
+    segment(t('Postać GymBro'),activeModel().id,models.map(({id,name})=>[id,t(name)]),'select-model')+
     '<div class="buddy-stage" style="'+modelMotionStyle()+'">'+buddyModel(avatarSide,tryOn,shine)+
     (preview?'<span class="buddy-preview-tag">'+t('Przymiarka ·')+' '+t(preview.name)+'</span>':'')+'</div>'+skinTestBadge()+xpBar(player)+streakInfo(player)+
     '<p class="meta xp-note">'+XP_PER_DAY+' '+t('XP za pierwszy zapisany trening dnia, z mnożnikiem do ×1,5 za tygodnie z rzędu. Pierwszy nowy rekord dnia daje dodatkowe')+' '+XP_PER_RECORD+' '+t('XP. Za każdy awans dostajesz')+' '+COINS_PER_LEVEL+' '+t('monet')+'.</p></section>'+
@@ -421,6 +424,7 @@ function showHome(){
 }
 function showMap(){
   const context=mapData();
+  const {layout}=activeModel();
   const chips=Object.entries(layout[side].warstwy)
     .sort(([a],[b])=>intensity(context,b)-intensity(context,a))
     .map(([key,m])=>'<button type="button" class="muscle" data-act="muscle" data-key="'+key+'"><b>'+esc(t(m.nazwa))+'</b><span><i style="width:'+100*intensity(context,key)+'%"></i></span></button>').join('');
@@ -584,7 +588,7 @@ function liftCards(results={}){
 }
 function profileAvatar(person,own=false){
   if(own) return buddyModel('przod');
-  return buddyModel('przod',null,null,{worn:person.worn??[],skin:person.previewSkin??person.skin??'default'});
+  return buddyModel('przod',null,null,{worn:person.worn??[],skin:person.previewSkin??person.skin??'default',model:modelFor(person.model)});
 }
 function clanLeaderBadge(id){
   return id===clanState.clan?.ownerId?'<span class="clan-leader-badge">'+t('Lider')+'</span>':'';
@@ -1106,7 +1110,7 @@ function openMuscle(key){
     } else if (!layer.hidden) layer.style.opacity='.25';
     layer.style.animation='none';
   }
-  openModal(esc(t(layout[side].warstwy[key].nazwa)),
+  openModal(esc(t(activeModel().layout[side].warstwy[key].nazwa)),
     (context.demo?'<p class="meta">'+t('Przykładowe obciążenie')+'</p>':'<div class="stats"><div><span class="meta">'+t('Liczba serii')+'</span><strong>'+(stat?.sets??0)+'</strong></div><div><span class="meta">'+t('Ostatni trening')+'</span><strong>'+
     (stat?.recent?formatter.format(stat.recent):'–')+'</strong></div></div>')+
     '<p class="meta">'+t('Intensywność na mapie:')+' '+Math.round(value*100)+'%</p>'+action(t('Zamknij'),'close','primary'));
@@ -1334,12 +1338,13 @@ function showPicker(){
   drawCatalog();
 }
 function catalogThumb(label){
+  const {layout,root}=activeModel();
   const frames=previewFrames(layout,weightsFor(label,data.custom));
   if(!frames.length) return '<span class="catalog-thumb" aria-hidden="true">'+icon('dumbbell')+'</span>';
   return '<span class="catalog-thumb '+(frames.length>1?'dual':'')+'" aria-hidden="true">'+frames.map(frame=>
     '<span class="catalog-frame" data-preview-side="'+frame.side+'" data-preview-muscles="'+frame.keys.join(',')+'">'+
     '<span class="catalog-zoom" style="width:'+frame.width+'%;height:'+frame.height+'%;left:'+frame.left+'%;top:'+frame.top+'%">'+
-    '<img class="catalog-base" src="assets/'+frame.side+'_baza.webp" loading="lazy" alt="">'+
+    '<img class="catalog-base" src="'+root+frame.side+'_baza.webp" loading="lazy" alt="">'+
     frame.files.map(file=>'<img src="'+file+'" loading="lazy" alt="">').join('')+'</span></span>').join('')+'</span>';
 }
 function openOwnExercise(){
@@ -1787,6 +1792,16 @@ document.addEventListener('click',async event=>{
       confirmModal(t('Opuścić klan?'),t('Aby wrócić, użyj kodu zaproszenia.'),'clan-confirm-leave',t('Opuść klan'));break;
     case 'clan-confirm-leave':leaveClan();break;
     case 'avatar-side':avatarSide=key;render();break;
+    case 'select-model':{
+      const model=modelFor(key);
+      if(model.id!==key||model.id===activeModel().id) break;
+      data.wardrobe.model=model.id;
+      rememberAppearance();
+      render();
+      app.querySelector('[data-act="select-model"][data-key="'+key+'"]')?.focus({preventScroll:true});
+      syncSocialProfiles();
+      break;
+    }
     case 'wardrobe-tab':
       wardrobeTab=key;tryOn=null;render();break;
     case 'open-shop':wardrobeTab='sklep';render();break;
@@ -1916,7 +1931,7 @@ async function loadCloudData(){
   const {data:prof}=await supabase.from('profiles').select('username,app_data').eq('id',user.id).maybeSingle();
   if(prof?.username) nickname=prof.username;
   if(prof?.app_data&&typeof prof.app_data==='object'){
-    data={...data,...prof.app_data};
+    data={...data,...prof.app_data,wardrobe:wardrobeFrom(prof.app_data.wardrobe??data.wardrobe)};
     savedRestPushSignature=restPushSignature(data.draft?.rest);
     localStorage.setItem(storage,JSON.stringify(data));
   }
