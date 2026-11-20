@@ -198,6 +198,8 @@ const english={
   "z rzędu": "in a row",
   "Mnożnik treningu: ×": "Workout multiplier: ×",
   "Staż krótszy niż miesiąc": "Less than one month in the clan",
+  "Staż krótszy niż dzień": "Less than a day in the clan",
+  "Brak daty dołączenia": "Join date unavailable",
   "stażu": "in the clan",
   "GymBro od przodu": "GymBro front view",
   "GymBro od tyłu": "GymBro back view",

@@ -302,9 +302,16 @@ function tenureDuration(months){
   const remainder=months%12;
   return [years?formatUnit(years,'year'):'',remainder||!years?formatUnit(remainder,'month'):''].filter(Boolean).join(', ');
 }
-function tenureText(months){
+function tenureMilestoneText(months){
   if(!months) return t('Staż krótszy niż miesiąc');
   return tenureDuration(months)+' '+t('stażu');
+}
+function tenureText(tenure){
+  if(!tenure) return t('Brak daty dołączenia');
+  if(!tenure.amount) return t('Staż krótszy niż dzień');
+  const duration=formatUnit(tenure.amount,tenure.unit);
+  const remainder=tenure.months?', '+formatUnit(tenure.months,'month'):'';
+  return duration+remainder+' '+t('stażu');
 }
 function tattooLayers(model,tattoos,preview){
   const marks=preview?.slot?placeTattoo(tattoos,preview.id,preview.slot,preview.color):tattoos;
@@ -880,7 +887,7 @@ function clanMessages(fresh=new Set()){
       '<div class="clan-pr'+(fresh.has(message.seq)?' fresh':'')+'">'+recordContent(item.label,item.kg,item.previous)+'</div>'+
       '<button type="button" class="clan-replay" data-act="clan-replay" data-key="'+message.seq+'">'+icon('play')+' '+t('Odtwórz animację')+'</button></article>';
     if(item.kind==='tenure') return '<article class="clan-message clan-activity tenure-event">'+meta+
-      '<p class="clan-activity-text">'+icon('calendar')+'<span><strong>'+sender+'</strong> '+t('osiąga')+' '+tenureText(item.months)+'.</span></p></article>';
+      '<p class="clan-activity-text">'+icon('calendar')+'<span><strong>'+sender+'</strong> '+t('osiąga')+' '+tenureMilestoneText(item.months)+'.</span></p></article>';
     if(item.kind==='golem-crack'||item.kind==='golem-win'){
       const zones=Array.isArray(item.zones)?item.zones.filter(key=>Object.hasOwn(golemZones,key)).map(key=>t(golemZones[key])).join(', '):'';
       const messageText=item.kind==='golem-win'?t('Klan pokonał Żelaznego Golema!'):t('Pękła osłona Golema')+(zones?' · '+zones:'');

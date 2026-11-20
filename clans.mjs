@@ -67,8 +67,45 @@ async function getUser() {
   return user;
 }
 
+const clanCalendar = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/Warsaw',
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+  second: 'numeric',
+  fractionalSecondDigits: 3,
+  hourCycle: 'h23',
+});
+
+function clanLocalTime(timestamp) {
+  const { year, month, day, hour, minute, second, fractionalSecond } = Object.fromEntries(
+    clanCalendar.formatToParts(timestamp).map(({ type, value }) => [type, Number(value)])
+  );
+  return new Date(Date.UTC(year, month-1, day, hour, minute, second, fractionalSecond));
+}
+
+export function clanTenure(joinedAt, now = Date.now()) {
+  if (!joinedAt) return null;
+  const joined = Date.parse(joinedAt);
+  if (!Number.isFinite(joined) || joined > now) return null;
+  const start = clanLocalTime(joined);
+  const end = clanLocalTime(now);
+  const days = Math.max(0, Math.floor((end-start)/86400000));
+  if (days < 7) return { unit: 'day', amount: days };
+
+  const year = end.getUTCFullYear(), month = end.getUTCMonth();
+  const lastDay = new Date(Date.UTC(year, month+1, 0)).getUTCDate();
+  const anniversary = Date.UTC(year, month, Math.min(lastDay, start.getUTCDate()),
+    start.getUTCHours(), start.getUTCMinutes(), start.getUTCSeconds(), start.getUTCMilliseconds());
+  const months = (year-start.getUTCFullYear())*12 + month-start.getUTCMonth() - Number(end < anniversary);
+  if (months >= 12) return { unit: 'year', amount: Math.floor(months/12), months: months%12 };
+  if (months > 0) return { unit: 'month', amount: months };
+  return { unit: 'week', amount: Math.floor(days/7) };
+}
+
 function mapMember(p) {
-  const months = p.updated_at ? Math.max(0, Math.floor((Date.now() - new Date(p.updated_at).getTime()) / (30 * 86400000))) : 0;
   return {
     id: p.id,
     nick: p.username,
@@ -83,7 +120,7 @@ function mapMember(p) {
     previewSkin: p.preview_skin ?? null,
     week: p.week_key ?? '',
     workouts: p.week_workouts ?? 0,
-    tenure: months,
+    tenure: clanTenure(p.clan_joined_at),
     photo: null,
     best: p.best_lifts ?? {},
     recent: (p.recent_workouts ?? []).map(w => ({ ...w, hasDetails: Boolean(w.exercises?.length) })),
