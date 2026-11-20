@@ -163,7 +163,7 @@ const english={
   "Czarny tank top": "Black tank top",
   "Na tułów": "Torso",
   "Przenieś": "Move",
-  "Zmień kolor": "Change color",
+  "Oba kolory w cenie": "Both colors included",
   "Tatuaż kupiony i założony": "Tattoo purchased and applied",
   "Brak przedmiotów w tej kategorii.": "No items in this category.",
   "Postacie": "Characters",

@@ -374,7 +374,11 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
   mask:var(--tattoo-art) center/contain no-repeat
 }
 .tattoo-ink[data-ink="white"]{background:#f4eaf6}
-.buddy-tattoo{position:absolute;transform:translate(-50%,-50%) rotate(var(--tattoo-angle));opacity:.86}
+.buddy-tattoo{
+  position:absolute;transform:translate(-50%,-50%) rotate(var(--tattoo-angle));
+  background:#27202c;mix-blend-mode:multiply;opacity:.64;filter:blur(.15px)
+}
+.buddy-tattoo[data-ink="white"]{background:#e2dae6;mix-blend-mode:screen;opacity:.47}
 .tattoo-thumb{width:100%;height:100%}
 .outfit-thumb:has(.tattoo-thumb[data-ink="black"]){background:radial-gradient(circle at center,#987e9f,#725c7b 78%)}
 .buddy-figure .buddy-base{filter:var(--material-filter,brightness(1)) drop-shadow(0 7px 12px #0b0915b8)}
@@ -408,6 +412,12 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .tattoo-controls{display:flex;flex-wrap:wrap;gap:5px}
 .tattoo-controls .segmented{max-width:100%}
 .tattoo-controls button{min-height:36px;padding-inline:8px}
+.tattoo-owned-colors{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.tattoo-owned-colors .btn{min-height:34px;padding:5px 8px;gap:5px;font-size:12px}
+.tattoo-owned-colors .btn[aria-pressed="true"]{border-color:#ab70d8;background:#38224c}
+.tattoo-owned-colors i{width:10px;height:10px;border-radius:50%;background:#17111c;border:1px solid #af99b9}
+.tattoo-owned-colors [data-color="white"] i{background:#f4eaf6}
+.tattoo-color-note{margin-top:5px}
 .outfit-row{display:grid;align-items:center;grid-template-columns:65px minmax(0,1fr);gap:12px;padding:9px;border:1px solid #432d53;border-radius:11px;background:#211729}
 .outfit-thumb{display:grid;place-items:center;width:65px;height:63px;padding:7px;border:1px solid #573764;background:radial-gradient(circle at center,#4a2d58,#2b1d34 75%);border-radius:9px}
 .outfit-thumb img{max-width:100%;max-height:100%;object-fit:contain}

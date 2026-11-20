@@ -3,7 +3,7 @@ import {t,setLanguage,uiLocale} from './locale.mjs';
 import {lifts,liftResults,clanProfile,workoutRecord,workoutActivities,clanRequest,friendsRequest,profileRequest} from './clans.mjs';
 import {models,modelFor} from './models.mjs';
 import {items,wardrobeFrom,legacyProgress,progression,buyItem,toggleItem,toggleTattoo,XP_PER_DAY,XP_PER_RECORD,COINS_PER_LEVEL} from './gymbro.mjs';
-import {placeTattoo,tattooAreas,tattooFits,tattooInks,tattooPlacements,tattooSlots} from './tattoos.mjs';
+import {placeTattoo,tattooAreas,tattooFits,tattooFrame,tattooInks,tattooSlots} from './tattoos.mjs';
 import {plans,muscles,standard,example,normalize,weightsFor,completedCount,newDraft,blankSet,newId,previousBest,exerciseHistory,numberedCompletedSets,exerciseConfig,MAX_PLAN_SETS,MAX_PLAN_REPS,elapsedSeconds,remainingSeconds,timeLabel,statsFor,dayKey,weekKeys,recentSessions} from './training.mjs';
 
 import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,exerciseTechnique,matchesExercise} from './catalog.mjs';
@@ -287,11 +287,11 @@ function tenureText(months){
   return tenureDuration(months)+' '+t('stażu');
 }
 function tattooLayers(model,tattoos,preview){
-  const positions=tattooPlacements[model.id];
-  if(!positions) return '';
   const marks=preview?.slot?placeTattoo(tattoos,preview.id,preview.slot,preview.color):tattoos;
   return Object.entries(marks).map(([slot,mark])=>{
-    const [x,y,width,height,angle]=positions[slot];
+    const frame=tattooFrame(model.id,slot,mark.id);
+    if(!frame) return '';
+    const [x,y,width,height,angle]=frame;
     return '<span class="buddy-tattoo tattoo-ink" data-ink="'+mark.color+'" data-placement="'+slot+'" aria-hidden="true" '+
       'style="--tattoo-art:url(assets/tattoos/'+mark.id+'.webp);left:'+x+'%;top:'+y+'%;width:'+width+'%;height:'+height+'%;--tattoo-angle:'+angle+'deg"></span>';
   }).join('');
@@ -338,17 +338,22 @@ function tattooRow(item,coins){
   const filtering=wardrobeFilter==='tattoos';
   const slot=filtering?tattooSlot:current??tattooAreas.find(area=>item.areas.includes(area.id)).slots[0];
   const color=filtering?tattooColor:tattoos[current]?.color??tattooColor;
-  const active=current===slot&&tattoos[slot]?.color===color;
+  const active=current===slot;
   const trying=tryOn?.id===item.id&&tryOn.slot===slot&&tryOn.color===color;
-  const attributes=' type="button" data-key="'+item.id+'" data-slot="'+slot+'" data-color="'+color+'"';
-  const equipLabel=active?'Zdejmij':current===slot?'Zmień kolor':current?'Przenieś':'Załóż';
-  const button=(act,label,style='ghost',extra='')=>'<button class="btn '+style+'" data-act="'+act+'"'+attributes+extra+'>'+label+'</button>';
+  const equipLabel=active?'Zdejmij':current?'Przenieś':'Załóż';
+  const button=(act,label,style='ghost',extra='',position=slot,ink=color)=>
+    '<button type="button" class="btn '+style+'" data-act="'+act+'" data-key="'+item.id+'" data-slot="'+position+'" data-color="'+ink+'"'+extra+'>'+label+'</button>';
+  const inks=current?'<div class="tattoo-owned-colors" role="group" aria-label="'+t('Kolor tatuażu')+' · '+t(item.name)+'">'+
+    tattooInks.map(([ink,label])=>button('tattoo-recolor','<i aria-hidden="true"></i>'+t(label),'ghost',
+      ' aria-pressed="'+(tattoos[current].color===ink)+'"',current,ink)).join('')+'</div>':'';
   return '<article class="outfit-row"><div class="outfit-thumb">'+
     '<span class="tattoo-thumb tattoo-ink" data-ink="'+color+'" aria-hidden="true" style="--tattoo-art:url(assets/tattoos/'+item.id+'.webp)"></span></div>'+
     '<div class="outfit-description"><h3>'+t(item.name)+'</h3><span class="meta">'+
     (current?t(tattooSlots[current]):t('Tatuaż'))+'</span><div class="outfit-actions">'+
     button('tattoo-try',t(trying?'Zakończ podgląd':'Przymierz'),'ghost',' aria-pressed="'+trying+'"')+
-    (owned?button('tattoo-equip',t(equipLabel)):button('outfit-buy',t('Kup')+' '+icon('coin')+' '+item.price,'primary',coins<item.price?' disabled':''))+'</div></div></article>';
+    (owned?button('tattoo-equip',t(equipLabel),'ghost','',slot,active?tattoos[slot].color:color):
+      button('outfit-buy',t('Kup')+' '+icon('coin')+' '+item.price,'primary',coins<item.price?' disabled':''))+'</div>'+
+    (owned?inks:'<p class="meta tattoo-color-note">'+t('Oba kolory w cenie')+'</p>')+'</div></article>';
 }
 function tattooControls(){
   const area=tattooAreas.find(entry=>entry.id===tattooArea);
@@ -1893,12 +1898,18 @@ document.addEventListener('click',async event=>{
         render();
       }
       break;
-    case 'tattoo-equip':
+    case 'tattoo-recolor':
+    case 'tattoo-equip':{
+      const current=data.wardrobe.tattoos[slot];
+      if(act==='tattoo-recolor'&&(current?.id!==key||current.color===color)) break;
       if(toggleTattoo(data.wardrobe,key,slot,color)){
+        if(act==='tattoo-recolor') tattooColor=color;
         tryOn=null;avatarSide='przod';
         rememberAppearance();render();syncSocialProfiles();
+        if(act==='tattoo-recolor') app.querySelector('[data-act="tattoo-recolor"][data-key="'+key+'"][data-color="'+color+'"]')?.focus({preventScroll:true});
       }
       break;
+    }
     case 'outfit-buy':
       if(buyItem(data.wardrobe,key,currentProgress().coins,slot,color)){
         tryOn=null;
