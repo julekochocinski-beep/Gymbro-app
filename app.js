@@ -667,8 +667,10 @@ function openOneRepMax(){
     '<p class="meta">'+t('Wpisz ciężar w kg i liczbę powtórzeń z jednej serii.')+'</p>'+
     '<label class="field">'+t('Ćwiczenie')+'<select name="lift">'+
     lifts.map(lift=>'<option value="'+lift.id+'">'+t(lift.display)+'</option>').join('')+'</select></label>'+
-    '<label class="field">'+t('Ciężar × powtórzenia')+
-    '<input name="series" type="text" placeholder="100 × 3" maxlength="24" autocomplete="off" spellcheck="false" required></label>'+
+    '<label class="field">'+t('Ciężar (kg)')+
+    '<input name="weight" type="text" inputmode="decimal" pattern="[0-9]+([.,][0-9]+)?" placeholder="100" maxlength="12" autocomplete="off" required></label>'+
+    '<label class="field">'+t('Powtórzenia')+
+    '<input name="reps" type="number" inputmode="numeric" min="1" step="1" placeholder="3" autocomplete="off" required></label>'+
     '<button type="submit" class="btn primary full">'+t('Oblicz 1RM')+'</button>'+
     '<output class="one-rep-max-result" aria-live="polite" aria-atomic="true"></output>'+
     '<p class="meta">'+t('Wzór Epleya. Wynik jest szacunkiem i nie zapisuje się w rekordach.')+'</p></form>');
@@ -1662,7 +1664,7 @@ function finish(){
 
 document.addEventListener('input',event=>{
   if(event.target.form?.id==='one-rep-max-form'){
-    if(event.target.name==='series') event.target.setCustomValidity('');
+    if(event.target.name!=='lift') event.target.setCustomValidity('');
     event.target.form.querySelector('output').textContent='';
     return;
   }
@@ -1731,14 +1733,16 @@ document.addEventListener('submit',async event=>{
   const form=event.target;
   const fields=new FormData(form);
   if(form.id==='one-rep-max-form'){
-    const input=form.elements.series;
-    const estimate=estimateOneRepMax(input.value);
+    const {weight,reps,lift}=form.elements;
+    const count=reps.valueAsNumber;
+    const estimate=estimateOneRepMax(Number(weight.value.replace(',','.')),count);
     if(estimate===null){
-      input.setCustomValidity(t('Wpisz serię w formacie 100 × 3.'));
+      const input=Number.isSafeInteger(count)&&count>0?weight:reps;
+      input.setCustomValidity(t('Podaj poprawny ciężar i co najmniej jedno powtórzenie.'));
       input.reportValidity();
       return;
     }
-    const selected=form.elements.lift.selectedOptions[0].textContent;
+    const selected=lift.selectedOptions[0].textContent;
     form.querySelector('output').textContent=t('Szacowane 1RM')+' · '+formatKg.format(Number(estimate.toFixed(1)))+' kg · '+selected;
     return;
   }
