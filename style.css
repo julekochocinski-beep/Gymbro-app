@@ -240,6 +240,14 @@ dialog.picker-dialog{width:min(100% - 20px,530px);max-width:none;margin:auto aut
 .catalog-check{width:35px;height:35px;display:grid;place-items:center;border-radius:50%;background:#392a47;color:#d2abea}
 .catalog-item[aria-pressed="true"] .catalog-check{background:linear-gradient(140deg,#dc8bff,#9637e2);color:white;box-shadow:0 0 13px #be57f64d}
 .catalog-footer{display:grid;gap:7px;border-top:1px solid #382a44;padding-top:10px;flex:none}
+dialog.picker-compact{
+  position:fixed;inset:calc(var(--picker-viewport-top) + 6px) 0 auto;
+  height:calc(var(--picker-viewport-height) - 12px);max-height:none;margin:0 auto
+}
+.picker-compact .dialog-card{min-height:100%;height:100%;max-height:none;gap:6px;padding:10px}
+.picker-compact .catalog-scroll{flex:1;min-height:72px}
+.picker-compact .catalog-footer{grid-template-columns:repeat(2,minmax(0,1fr));padding-top:6px}
+.picker-compact .catalog-footer .btn{padding-inline:7px}
 
 #record{display:none;position:fixed;z-index:5;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));width:min(calc(100% - 26px),440px);transform:translateX(-50%);pointer-events:none;border:1px solid #cb7eff;border-radius:16px;padding:12px;gap:12px;align-items:center;background:radial-gradient(ellipse at 8% 40%,#56307d,#241430 65%);box-shadow:0 10px 42px #000b,0 0 23px #c262fc53}
 #record.visible{display:flex;animation:pr-enter .36s cubic-bezier(.17,.82,.28,1.28) both}

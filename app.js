@@ -45,6 +45,7 @@ const esc = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const app=document.querySelector('#app');
 const restDock=document.querySelector('#rest-dock');
 const dialog=document.querySelector('#dialog');
+const pickerViewport=window.visualViewport;
 const storage='gymbro-workouts-v1';
 const skinTestLevel=50;
 const nav = {dom:['home','Dom'],trening:['dumbbell','Trening'],klan:['clan','Społeczność'],mapa:['flame','Mapa'],historia:['calendar','Progress']};
@@ -1180,7 +1181,19 @@ function openModal(title,body,options={}){
   dialog.className=options.sheet?'picker-dialog':'';
   dialog.innerHTML='<div class="dialog-card"><div class="card-head"><h2 id="dialog-title">'+title+'</h2><button type="button" class="btn ghost" data-act="close" aria-label="'+t('Zamknij')+'">'+icon('x')+'</button></div>'+body+'</div>';
   if(!dialog.open) dialog.showModal();
+  updatePickerViewport();
 }
+function updatePickerViewport(){
+  if(!dialog.open||!dialog.classList.contains('picker-dialog')) return;
+  const keyboardVisible=pickerViewport&&pickerViewport.scale===1&&
+    document.documentElement.clientHeight-pickerViewport.height>100;
+  dialog.classList.toggle('picker-compact',Boolean(keyboardVisible));
+  if(!keyboardVisible) return;
+  dialog.style.setProperty('--picker-viewport-top',Math.max(0,pickerViewport.offsetTop)+'px');
+  dialog.style.setProperty('--picker-viewport-height',Math.floor(pickerViewport.height)+'px');
+}
+pickerViewport?.addEventListener('resize',updatePickerViewport);
+pickerViewport?.addEventListener('scroll',updatePickerViewport);
 function confirmModal(title,body,act,label){
   openModal(title,'<p class="meta">'+body+'</p><div class="controls">'+action(t('Wróć'),'close')+action(label,act,'danger')+'</div>');
 }
@@ -1415,7 +1428,7 @@ function openPicker(target){
 }
 function showPicker(){
   openModal(t('Dodaj ćwiczenia'),
-    '<label class="catalog-search">'+icon('search')+'<input type="search" id="catalog-query" aria-label="'+t('Szukaj ćwiczeń')+'" placeholder="'+t('Szukaj ćwiczeń')+'"></label>'+
+    '<label class="catalog-search">'+icon('search')+'<input type="search" enterkeyhint="search" id="catalog-query" aria-label="'+t('Szukaj ćwiczeń')+'" placeholder="'+t('Szukaj ćwiczeń')+'"></label>'+
     '<div class="catalog-chips" aria-label="'+t('Partia mięśni')+'">'+[['all',t('Wszystkie')],...categories,['wlasne',t('Własne')]].map(([key,label])=>
       '<button type="button" data-act="catalog-filter" data-key="'+key+'" aria-pressed="'+(key===picker.category)+'">'+t(label)+'</button>').join('')+'</div>'+
     '<div class="catalog-scroll" id="catalog-list"></div>'+
@@ -1788,6 +1801,11 @@ document.addEventListener('submit',async event=>{
   }
 });
 document.addEventListener('keydown',event=>{
+  if(event.target.id==='catalog-query'&&event.key==='Enter'&&!event.isComposing){
+    event.preventDefault();
+    event.target.blur();
+    return;
+  }
   const target=event.target.closest('.muscle-targets [data-act="muscle"]');
   if(!target||(event.key!=='Enter'&&event.key!==' ')) return;
   event.preventDefault();
