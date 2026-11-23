@@ -39,9 +39,6 @@ svg{width:20px;height:20px;flex:none;vertical-align:middle}
 .ranked[data-rank="gold"]{--rank-accent:#ffd773;--rank-shadow:#765220;--rank-light:#fff6d4}
 .ranked[data-rank="diamond"]{--rank-accent:#a4f5ff;--rank-shadow:#45509b;--rank-light:#edf8ff}
 .material-defs{position:absolute;width:0;height:0;overflow:hidden}
-.skin-test-controls{display:grid;gap:8px;margin-bottom:12px}
-.skin-test-controls .btn{justify-self:start}
-.skin-test-badge{margin:10px 0;color:#b8f1ff;background:#172331;border:1px solid #32516a;border-radius:8px;padding:7px 10px;font-size:.8rem;font-weight:750;width:max-content;max-width:100%}
 .skin-list{display:grid;gap:8px}
 .skin-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;background:#201929;border:1px solid #352741;border-radius:11px;padding:10px;min-height:55px}
 .skin-row[aria-pressed="true"]{border-color:var(--rank-accent,var(--purple));background:#2a1d35}
@@ -644,3 +641,47 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .profile-training li{display:grid;gap:2px;border-top:1px solid var(--line);padding-top:7px;font-size:13px;overflow-wrap:anywhere}
 .nav a[href="#klan"]{min-width:0}
 @media(max-width:365px){.nav a[href="#klan"]{font-size:10px}}
+
+.golem-scene{
+  --golem-armor-edge:0 64%,24% 64%,25% 51%,30% 40%,38% 38%,47% 39%,54% 38%,63% 39%,69% 41%,75% 51%,76% 64%,100% 64%;
+  position:relative;
+  width:min(100%,310px);
+  margin:0 auto;
+  overflow:hidden;
+  border:1px solid #694780;
+  border-radius:16px;
+  background:#180f1f;
+}
+.golem-scene img{display:block;width:100%;height:auto}
+.golem-scene .golem-scene-legs{
+  position:absolute;
+  inset:0;
+  clip-path:polygon(var(--golem-armor-edge),100% 100%,0 100%);
+}
+.golem-armor-glow{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:#884bb8;
+  mix-blend-mode:multiply;
+  opacity:0;
+  -webkit-mask:url('./assets/golem/armor-mask.png') var(--armor-column,0%) var(--armor-row,0%)/300% 200% no-repeat;
+  mask:url('./assets/golem/armor-mask.png') var(--armor-column,0%) var(--armor-row,0%)/300% 200% no-repeat;
+}
+.golem-glow-upper{clip-path:polygon(0 0,var(--golem-armor-edge),100% 0)}
+.golem-armor-glow[data-side="back"]{--armor-row:100%}
+.golem-armor-glow[data-step="1"]{--armor-column:50%}
+.golem-armor-glow[data-step="2"]{--armor-column:100%}
+@media (prefers-reduced-motion:no-preference){
+  .golem-armor-glow{animation:golem-armor-pulse 3s ease-in-out infinite}
+}
+@keyframes golem-armor-pulse{
+  0%,100%{opacity:.04}
+  43%,57%{opacity:.64}
+}
+.golem-card .armor-zone{color:inherit;text-align:start;cursor:pointer}
+.golem-card .armor-zone:focus-visible{outline:2px solid #e6b3ff;outline-offset:2px}
+.golem-card{scroll-margin-top:70px}
+.golem-workout{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.clan-invite-actions{display:flex;flex-wrap:wrap;gap:6px}
+.clan-invite:has(.clan-invite-actions){flex-wrap:wrap}

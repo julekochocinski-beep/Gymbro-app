@@ -33,13 +33,12 @@ export function workoutRecord({ id, name, started, finished, exercises }) {
   };
 }
 
-export function clanProfile(sessions, wardrobe, progress, appearanceAt = 0, previewSkin = null) {
+export function clanProfile(sessions, wardrobe, progress, appearanceAt = 0) {
   const week = weekKeys();
   return {
     worn: wardrobe.worn,
     skin: unlockedSkin(wardrobe.skin, progress.level),
     appearanceAt,
-    previewSkin,
     level: progress.level,
     week: week[0],
     workouts: sessions.filter(session => week.includes(dayKey(session.finished))).length,
@@ -112,12 +111,11 @@ function mapMember(p) {
     level: p.level ?? 1,
     worn: p.worn ?? [],
     tattoos: tattoosFrom(p.app_data?.wardrobe?.tattoos),
-    skin: p.equipped_skin ?? 'default',
+    skin: unlockedSkin(p.equipped_skin, p.level ?? 1),
     model: modelFor(p.app_data?.wardrobe?.model).id,
     background: backgroundId(p.app_data?.wardrobe?.background),
     instagram: instagramHandle(p.app_data?.publicProfile?.instagram) ?? '',
     plans: sharedPlansFrom(p.app_data?.publicProfile?.plans),
-    previewSkin: p.preview_skin ?? null,
     week: p.week_key ?? '',
     workouts: p.week_workouts ?? 0,
     tenure: clanTenure(p.clan_joined_at),
@@ -239,7 +237,7 @@ export async function clanRequest(payload) {
     await supabase.from('profiles').update({
       level: p.level,
       equipped_skin: p.skin,
-      preview_skin: p.previewSkin,
+      preview_skin: null,
       worn: p.worn,
       appearance_at: p.appearanceAt,
       week_key: p.week,
@@ -326,7 +324,7 @@ export async function friendsRequest(payload) {
     await supabase.from('profiles').update({
       level: p.level,
       equipped_skin: p.skin,
-      preview_skin: p.previewSkin,
+      preview_skin: null,
       worn: p.worn,
       appearance_at: p.appearanceAt,
       best_lifts: p.best,
