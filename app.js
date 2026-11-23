@@ -10,6 +10,7 @@ import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,e
 import {estimateOneRepMax,exerciseWeightTrend,filterSessions,latestMuscleWorkout,monthGrid,moveMonth,progressionAdvice,weeklyProgress} from './progress.mjs';
 import {instagramHandle,publicProfile} from './profile-extras.mjs';
 import {workoutCardBlob} from './share-card.mjs';
+import {armorCount,clanCodeFromSearch,clanInviteUrl,golemArt} from './golem-view.mjs';
 import {MISSION_COINS,SEASON_COINS,GOLEM_COINS,GOLEM_GOAL,golemZones,weeklyMissions,golemWorkout,sendGolemWorkout,golemSnapshot,memberArtifacts} from './challenges.mjs';
 import {previewFrames} from './exercise-preview.mjs';
 import {armRestSound,playRestSignal} from './rest-signal.mjs';
@@ -83,6 +84,7 @@ let data={
 let side=preferredSide(data.sessions[0]), mode='ostatni', selectedSession=null;
 let toastTimeout, recordTimeout;
 let planEdit=null, picker=null;
+let inviteCode='';
 let clanState=null, clanError='', clanBusy=false, syncAgain=false, lastProfile='', clanMode='create';
 let pendingChat=null, clanVersion=0;
 let socialTab='klan', friendsState=null, friendsError='', friendsRead=null, friendsWriting=false, friendsAgain=false, lastFriendsProfile='';
@@ -91,7 +93,7 @@ let profilePhoto=null, photoWriting=false, draftPhotoPreview=null;
 let shareCardUrl=null;
 let progressCacheKey, progressCache;
 let golemBattle=null, golemOwner=null, golemRead=null, golemAgain=false, golemError=false, clanMapSide='przod';
-let missionTab='weekly';
+let missionTab='weekly', golemView='front', lastClanWorkout='';
 
 let avatarSide='przod', wardrobeTab=data.wardrobe.owned.length?'garderoba':'sklep', tryOn=null;
 let previewBackground=null;
@@ -168,7 +170,7 @@ function link(label,target,classes='link',glyph=''){
 function heading(title,desc,extra=''){
   return '<div class="page-head"><div><h1 class="dimensional-title">'+title+'</h1>'+(desc?'<p class="sub">'+desc+'</p>':'')+'</div>'+extra+'</div>';
 }
-const route=()=>Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):'dom';
+const route=()=>Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):(!location.hash&&inviteCode?'klan':'dom');
 
 function preferredSide(session){
   if(!session) return 'przod';
@@ -612,7 +614,8 @@ function showMap(){
     '<div class="card-head"><h3>'+t('Zakres')+'</h3></div><div class="controls">'+segment(t('Zakres danych'),mode,[['ostatni',t('Trening')],['tydzien',t('7 dni')]],'range')+'</div>'+
     (data.sessions.length&&mode==='ostatni'?'<label class="field" style="margin-top:12px">'+t('Wybierz trening')+'<select id="session-select">'+data.sessions.map(s=>
       '<option value="'+esc(s.id)+'" '+(s.id===context.latest?.id?'selected':'')+'>'+formatter.format(s.finished)+' · '+esc(s.name)+'</option>').join('')+'</select></label>':'')+
-    '</section>'+mapCard(context)+(context.latest&&mode==='ostatni'?friendButton('share-workout-card',context.latest.id,t('Udostępnij kartę treningu'),'ghost full'):'')+
+    '</section>'+(lastClanWorkout&&lastClanWorkout===context.latest?.id&&mode==='ostatni'&&data.clanLink?
+      '<div class="card card-pad golem-workout"><span>'+t('Tygodniowa walka klanu')+'</span>'+action(t('Zobacz postęp walki'),'open-golem','ghost','shield')+'</div>':'')+mapCard(context)+(context.latest&&mode==='ostatni'?friendButton('share-workout-card',context.latest.id,t('Udostępnij kartę treningu'),'ghost full'):'')+
     '<section class="card card-pad"><h3>'+t('Partie mięśni')+'</h3><div class="muscle-list">'+chips+'</div></section>'+
     (unknown?'<section class="card card-list"><h3>'+t('Nieprzypisane ćwiczenia')+'</h3><p class="meta">'+t('Wybierz pracujące mięśnie, żeby uwzględnić ćwiczenie na mapie.')+'</p>'+unknown+'</section>':'')+
     '<section class="card card-pad"><label class="field">'+t('Liczba ważonych serii do pełnego podświetlenia')+'<input id="threshold" type="number" min="1" max="100" step="1" value="'+data.threshold+'"></label></section></div>';
@@ -757,8 +760,9 @@ function exerciseProgressionHint(exercise,index,previous){
   if(data.draft.dismissedAdvice?.includes(exerciseKey(exercise.label))) return '';
   const advice=progressionAdvice(exercise,previous);
   if(!advice) return '';
-  return '<div class="exercise-advice"><p><strong>'+t('Podpowiedź progresji')+'</strong> '+
-    t(advice.kind==='increase'?'Rozważ małą podwyżkę z {kg} kg.':'Powtórz {kg} kg.').replace('{kg}',formatKg.format(advice.weight))+'</p>'+
+  const message=t(advice.kind==='increase'?'Rozważ małą podwyżkę z {kg} kg.':'Zostań przy {kg} kg i spróbuj zrobić {reps} powtórzeń w serii nr {set}.')
+    .replace('{kg}',formatKg.format(advice.weight)).replace('{reps}',advice.reps).replace('{set}',advice.number);
+  return '<div class="exercise-advice"><p><strong>'+t('Podpowiedź progresji')+'</strong> '+message+'</p>'+
     '<button type="button" class="btn ghost" data-act="dismiss-exercise-advice" data-ex="'+index+'">'+t('Pomiń')+'</button></div>';
 }
 function exerciseCard(exercise,i,notes){
@@ -890,7 +894,7 @@ function clanMessages(fresh=new Set()){
       '<p class="clan-activity-text">'+icon('calendar')+'<span><strong>'+sender+'</strong> '+t('osiąga')+' '+tenureMilestoneText(item.months)+'.</span></p></article>';
     if(item.kind==='golem-crack'||item.kind==='golem-win'){
       const zones=Array.isArray(item.zones)?item.zones.filter(key=>Object.hasOwn(golemZones,key)).map(key=>t(golemZones[key])).join(', '):'';
-      const messageText=item.kind==='golem-win'?t('Klan pokonał Żelaznego Golema!'):t('Pękła osłona Golema')+(zones?' · '+zones:'');
+      const messageText=item.kind==='golem-win'?t('Klan pokonał Golema Kuźni!'):t('Pękła osłona Golema')+(zones?' · '+zones:'');
       return '<article class="clan-message clan-activity golem-event">'+meta+'<p class="clan-activity-text">'+
         icon(item.kind==='golem-win'?'trophy':'shield')+esc(messageText)+'</p></article>';
     }
@@ -903,18 +907,21 @@ function clanMessages(fresh=new Set()){
 }
 function clanGolemCard(){
   const battle=golemBattle?.clan===clanState?.clan?.id?golemBattle:null;
-  const header='<div class="card-head"><div><h2>'+t('Żelazny Golem')+'</h2><p class="meta">'+t('Tygodniowa walka klanu')+'</p></div><span class="golem-icon">'+icon(battle?.won?'trophy':'shield')+'</span></div>';
+  const header='<div class="card-head"><div><h2>'+t('Golem Kuźni')+'</h2><p class="meta">'+t('Tygodniowa walka klanu')+'</p></div><span class="golem-icon">'+icon(battle?.won?'trophy':'shield')+'</span></div>';
   if(!battle) return header+'<p class="meta" role="status">'+t(golemError?'Walka klanu jest chwilowo niedostępna.':'Ładowanie walki klanu…')+'</p>';
   const waiting=battle.eligible===false&&battle.eligibleFrom;
   const hint=waiting?t('Do walki i nagród dołączysz od {date}.')
     .replace('{date}',()=>fullDayFormatter.format(dateForKey(battle.eligibleFrom))):
-    battle.won?t('Klan pokonał Żelaznego Golema!'):
+    battle.won?t('Klan pokonał Golema Kuźni!'):
     t(battle.attackedToday?'Twój atak na dziś już się liczy.':'Zapisz trening, aby trafić jedną lub więcej stref pancerza.');
-  return header+'<div class="golem-armor">'+Object.entries(golemZones).map(([key,label])=>{
-    const count=Math.min(battle.hits?.[key]??0,GOLEM_GOAL);
-    return '<div class="armor-zone'+(count===GOLEM_GOAL?' cracked':'')+'">'+
+  return header+golemArt(battle,golemView,GOLEM_GOAL)+
+    segment(t('Widok Golema'),golemView,[['front',t('Przód')],['back',t('Tył')]],'golem-side')+
+    '<div class="golem-armor">'+Object.entries(golemZones).map(([key,label])=>{
+    const count=armorCount(battle,key,GOLEM_GOAL);
+    return '<button type="button" class="armor-zone'+(count===GOLEM_GOAL?' cracked':'')+
+      '" data-act="golem-zone" data-key="'+key+'" aria-label="'+t(label)+' '+count+'/'+GOLEM_GOAL+'">'+
       '<span>'+t(label)+'</span><strong>'+count+'/'+GOLEM_GOAL+'</strong>'+
-      '<progress value="'+count+'" max="'+GOLEM_GOAL+'" aria-label="'+t(label)+'"></progress></div>';
+      '<progress value="'+count+'" max="'+GOLEM_GOAL+'" aria-hidden="true"></progress></button>';
   }).join('')+'</div><p class="meta'+(waiting?' golem-waiting':'')+'">'+hint+'</p><p class="meta">'+GOLEM_COINS+' '+t('monet i trofeum za udział w zwycięstwie.')+
     '</p>'+action(t('Heatmapa klanu'),'clan-heatmap','ghost full','flame');
 }
@@ -939,6 +946,9 @@ function openClanMuscle(key){
     action(t('Wróć do heatmapy'),'clan-heatmap','ghost full')+'</div>');
 }
 function showClan(){
+  if(inviteCode&&!currentUser) return '<section class="card card-pad stack"><h2>'+t('Zaproszenie do klanu')+'</h2>'+
+    '<p class="meta">'+t('Zaloguj się do GymBro lub załóż konto, żeby dołączyć do klanu.')+'</p>'+
+    link(t('Przejdź do logowania'),'ustawienia','btn primary full')+'</section>';
   if(!clanState) return '<section class="card card-pad stack"><p id="clan-status" role="status">'+esc(clanError||t('Ładowanie klanu…'))+'</p>'+
     (clanError?action(t('Spróbuj ponownie'),'clan-retry','ghost'):'')+'</section>';
   if(!clanState.clan){
@@ -948,13 +958,13 @@ function showClan(){
       '<form id="clan-start" class="stack">'+
       (create?'<label class="field">'+t('Nazwa klanu')+'<input name="name" required minlength="2" maxlength="40" placeholder="'+t('np. Żelazne Słonie')+'"></label>'+
       '<label class="field">'+t('Tag (3–4 znaki)')+'<input name="tag" class="clan-code" required minlength="3" maxlength="4" pattern="[A-Za-z0-9]{3,4}" placeholder="'+t('np. GYM')+'"></label>':
-      '<label class="field">'+t('Kod zaproszenia')+'<input name="code" class="clan-code" required minlength="6" maxlength="6" pattern="[A-Za-z0-9]{6}" placeholder="'+t('6 znaków')+'"></label>')+
+      '<label class="field">'+t('Kod zaproszenia')+'<input name="code" class="clan-code" required minlength="6" maxlength="6" pattern="[A-Za-z0-9]{6}" value="'+inviteCode+'" placeholder="'+t('6 znaków')+'"></label>')+
       '<p class="meta">'+t('Członkowie zobaczą Twój profil i szczegóły pięciu ostatnich treningów. Zapis treningu i nowe PR-y pojawią się na czacie klanu.')+'</p>'+
       '<p class="form-error" id="clan-start-error" role="alert" hidden></p><button class="btn primary" type="submit"'+(!nickname?' disabled':'')+'>'+(create?t('Utwórz klan'):t('Dołącz do klanu'))+'</button></form></section>';
   }
   const {tag,name,code}=clanState.clan;
   return '<div class="stack"><section class="card card-pad clan-invite">'+
-    '<div><h2><em>['+esc(tag)+']</em> '+esc(name)+'</h2><span class="meta">'+t('Kod zaproszenia')+'</span><strong>'+esc(code)+'</strong></div>'+action(t('Kopiuj'),'clan-copy','ghost')+'</section>'+
+    '<div><h2><em>['+esc(tag)+']</em> '+esc(name)+'</h2><span class="meta">'+t('Kod zaproszenia')+'</span><strong>'+esc(code)+'</strong></div>'+'<div class="clan-invite-actions">'+action(t('Udostępnij link'),'clan-share','primary')+action(t('Kopiuj kod'),'clan-copy','ghost')+'</div></section>'+
     '<section id="clan-golem" class="card card-pad challenge-card golem-card">'+clanGolemCard()+'</section>'+
     '<details class="card card-pad clan-roster"><summary><strong>'+t('Członkowie')+'</strong><span class="clan-roster-count" id="clan-member-count">'+clanState.members.length+'</span>'+icon('chevron')+'</summary>'+
     '<div id="clan-member-list">'+clanMembers()+'</div></details>'+
@@ -1154,6 +1164,12 @@ async function submitClanStart(form,fields){
   errorBox.hidden=true;
   try{
     const snapshot=await clanRequest({action:clanMode,...Object.fromEntries(fields)});
+    if(inviteCode&&snapshot?.clan){
+      inviteCode='';
+      const url=new URL(location.href);
+      url.searchParams.delete('klan');
+      history.replaceState(history.state,'',url.href);
+    }
     applyClan(snapshot);
     refreshClan();
   }catch(error){
@@ -2089,6 +2105,7 @@ function finish(){
   const after=currentProgress();
   if(data.clanLink){
     const clanId=data.clanLink;
+    lastClanWorkout=session.id;
     for(const event of workoutActivities(session,data.sessions.slice(1),before,after)) data.clanOutbox.push({...event,clanId});
     if(currentUser) data.golemOutbox.push(golemWorkout(session,data.custom,clanId,currentUser.id));
   }
@@ -2203,8 +2220,15 @@ document.addEventListener('submit',async event=>{
     if(res.error){toast(res.error.message);return;}
     currentUser=res.data.user;
     toast(isReg?'Konto utworzone! Ustaw teraz swój nick poniżej.':'Zalogowano!');
+    if(!currentUser) return;
     await loadCloudData();
     render();
+    refreshNickname();
+    if(inviteCode&&currentUser){
+      socialTab='klan';
+      go('klan');
+      refreshClan();
+    }
   }
   if(form.id==='measurements-form'){
     data.measurements=Object.fromEntries(measurementFields.flatMap(([id,,,min,max])=>{
@@ -2369,6 +2393,38 @@ document.addEventListener('click',async event=>{
       dialog.close();modifyFriends({action:'remove',peer:key});break;
     case 'clan-mode':clanMode=key;render();break;
     case 'clan-retry':refreshClan();break;
+    case 'open-golem':
+      socialTab='klan';
+      go('klan');
+      requestAnimationFrame(()=>app.querySelector('#clan-golem')?.scrollIntoView({block:'start'}));
+      break;
+    case 'golem-zone':
+    case 'golem-side': {
+      if(key!=='legs') golemView=key==='back'?'back':'front';
+      updateClanGolemCard();
+      app.querySelector('[data-act="'+act+'"][data-key="'+key+'"]')?.focus({preventScroll:true});
+      break;
+    }
+    case 'clan-share': {
+      const code=clanState?.clan?.code;
+      if(!code) break;
+      const url=clanInviteUrl(location.href,code);
+      try{
+        if(navigator.share){
+          await navigator.share({title:t('Zaproszenie do klanu')+' · GymBro',url});
+          break;
+        }
+        if(navigator.clipboard){
+          await navigator.clipboard.writeText(url);
+          toast(t('Skopiowano link zaproszenia'));
+          break;
+        }
+      }catch(error){if(error.name==='AbortError') break;}
+      openModal(t('Zaproszenie do klanu'),'<label class="field">'+t('Link zaproszenia')+
+        '<input type="url" readonly value="'+esc(url)+'"></label>');
+      dialog.querySelector('input')?.select();
+      break;
+    }
     case 'clan-heatmap':
       if(golemBattle?.clan===clanState?.clan?.id&&golemBattle)
         openModal(t('Heatmapa klanu'),clanHeatmap());
@@ -2621,6 +2677,8 @@ document.addEventListener('error',event=>{
 updateLocale();
 document.querySelector('[data-icon]').innerHTML=icon('bolt');
 openSkinTestLink();
+inviteCode=clanCodeFromSearch(location.search);
+if(inviteCode) clanMode='join';
 async function loadCloudData(){
   const {data:{user}}=await supabase.auth.getUser();
   currentUser=user;
@@ -2638,9 +2696,12 @@ async function loadCloudData(){
   refreshGolem();
 }
 render();
-loadCloudData().then(()=>{render();refreshNickname();syncSocialProfiles();});
-if(route()==='klan'&&!data.clanLink) refreshSocialTab();
-setInterval(()=>{if(route()==='klan'&&!document.hidden) refreshSocialTab();},3000);
+loadCloudData().then(()=>{
+  render();refreshNickname();syncSocialProfiles();
+  if(inviteCode&&currentUser&&route()==='klan') refreshClan();
+});
+if(!inviteCode&&route()==='klan'&&!data.clanLink) refreshSocialTab();
+setInterval(()=>{if(route()==='klan'&&!document.hidden&&(!inviteCode||currentUser)) refreshSocialTab();},3000);
 window.addEventListener('online',()=>{
   restPush.retry(currentUser?.id);
   refreshGolem();

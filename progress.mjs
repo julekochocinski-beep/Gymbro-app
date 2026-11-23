@@ -24,15 +24,15 @@ export function progressionAdvice(exercise,previousSets){
   if(!repMax) return null;
   const byNumber=new Map(previousSets.map(set=>[set.number,set]));
   let weight;
-  let increase=true;
+  let nextSet=null;
   for(let number=1;number<=setCount;number++){
     const set=byNumber.get(number);
     const kg=recordedWeight(set?.kg),reps=Number(set?.reps);
     if(kg===null||kg<=0||!Number.isInteger(reps)||reps<1||(weight!==undefined&&kg!==weight)) return null;
     weight=kg;
-    if(reps<repMax) increase=false;
+    if(reps<repMax&&(!nextSet||reps+1>nextSet.reps)) nextSet={number,reps:reps+1};
   }
-  return {kind:increase?'increase':'repeat',weight};
+  return nextSet?{kind:'repeat',weight,...nextSet}:{kind:'increase',weight};
 }
 
 export function latestMuscleWorkout(sessions,custom,muscle){
