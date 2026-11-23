@@ -660,6 +660,27 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
   inset:0;
   clip-path:polygon(0 64%,24% 64%,25% 51%,30% 40%,38% 38%,47% 39%,54% 38%,63% 39%,69% 41%,75% 51%,76% 64%,100% 64%,100% 100%,0 100%);
 }
+.golem-shield-glow{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:radial-gradient(ellipse at 50% 25%,#f7e0ff 0%,#d48aff 24%,transparent 58%);
+  mix-blend-mode:screen;
+  opacity:0;
+  -webkit-mask:url('./assets/golem/shield-mask.png') var(--shield-column,0%) var(--shield-row,0%)/300% 200% no-repeat;
+  mask:url('./assets/golem/shield-mask.png') var(--shield-column,0%) var(--shield-row,0%)/300% 200% no-repeat;
+}
+.golem-shield-glow[data-side="back"]{--shield-row:100%}
+.golem-shield-glow[data-step="1"]{--shield-column:50%}
+.golem-shield-glow[data-step="2"]{--shield-column:100%}
+@media (prefers-reduced-motion:no-preference){
+  .golem-shield-glow{animation:golem-shield-pulse 3.2s ease-in-out infinite}
+}
+@keyframes golem-shield-pulse{
+  0%,100%{opacity:.06}
+  42%{opacity:.48}
+  62%{opacity:.17}
+}
 .golem-card .armor-zone{color:inherit;text-align:start;cursor:pointer}
 .golem-card .armor-zone:focus-visible{outline:2px solid #e6b3ff;outline-offset:2px}
 .golem-card{scroll-margin-top:70px}
