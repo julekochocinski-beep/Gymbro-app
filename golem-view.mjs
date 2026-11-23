@@ -8,9 +8,13 @@ export function golemArt(battle,view,goal){
   const legs=armorCount(battle,'legs',goal);
   const frame=(step,layer='')=>'<img'+(layer?' class="'+layer+'"':'')+
     ' src="./assets/golem/'+side+(step?'-'+step:'')+'.webp" width="480" height="637" alt="" decoding="async">';
+  const glow=(step,layer='')=>step<goal?
+    '<span class="golem-armor-glow'+layer+'" data-side="'+side+'" data-step="'+step+'"></span>':'';
+  const split=upper!==legs;
   return '<div class="golem-scene" aria-hidden="true">'+frame(upper)+
-    (upper!==legs?frame(legs,'golem-scene-legs'):'')+
-    (upper<goal?'<span class="golem-shield-glow" data-side="'+side+'" data-step="'+upper+'"></span>':'')+'</div>';
+    (split?frame(legs,'golem-scene-legs'):'')+
+    glow(upper,split?' golem-glow-upper':'')+
+    (split?glow(legs,' golem-scene-legs'):'')+'</div>';
 }
 
 export function clanCodeFromSearch(search){
