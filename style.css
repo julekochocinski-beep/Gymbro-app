@@ -655,12 +655,11 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
   background:#180f1f;
 }
 .golem-scene img{display:block;width:100%;height:auto}
-.golem-scene svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.golem-fracture{fill:none;stroke-linecap:round;stroke-linejoin:round}
-.damage-1 .golem-fracture{stroke:#e6adf5;stroke-width:1.4;opacity:.78;filter:drop-shadow(0 0 1px #2b152f)}
-.damage-2 .golem-fracture{stroke:#efc3ff;stroke-width:2;filter:drop-shadow(0 0 3px #ae37f5)}
-.damage-3 .golem-fracture{stroke:#ffe7b7;stroke-width:3;filter:drop-shadow(0 0 3px #ff8c4a) drop-shadow(0 0 6px #af48ff)}
-.golem-fracture.branch{stroke-width:1.4}
+.golem-scene .golem-scene-legs{
+  position:absolute;
+  inset:0;
+  clip-path:polygon(0 64%,24% 64%,25% 51%,30% 40%,38% 38%,47% 39%,54% 38%,63% 39%,69% 41%,75% 51%,76% 64%,100% 64%,100% 100%,0 100%);
+}
 .golem-card .armor-zone{color:inherit;text-align:start;cursor:pointer}
 .golem-card .armor-zone:focus-visible{outline:2px solid #e6b3ff;outline-offset:2px}
 .golem-card{scroll-margin-top:70px}
