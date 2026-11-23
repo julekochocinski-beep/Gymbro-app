@@ -664,7 +664,7 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
   position:absolute;
   inset:0;
   pointer-events:none;
-  background:radial-gradient(ellipse at 50% 25%,#f7e0ff 0%,#d48aff 24%,transparent 58%);
+  background:radial-gradient(ellipse at 50% 25%,#fff3ff 0%,#e6acff 36%,transparent 70%);
   mix-blend-mode:screen;
   opacity:0;
   -webkit-mask:url('./assets/golem/shield-mask.png') var(--shield-column,0%) var(--shield-row,0%)/300% 200% no-repeat;
@@ -674,12 +674,12 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .golem-shield-glow[data-step="1"]{--shield-column:50%}
 .golem-shield-glow[data-step="2"]{--shield-column:100%}
 @media (prefers-reduced-motion:no-preference){
-  .golem-shield-glow{animation:golem-shield-pulse 3.2s ease-in-out infinite}
+  .golem-shield-glow{animation:golem-shield-pulse 2.7s ease-in-out infinite}
 }
 @keyframes golem-shield-pulse{
-  0%,100%{opacity:.06}
-  42%{opacity:.48}
-  62%{opacity:.17}
+  0%,100%{opacity:.04}
+  44%{opacity:.78}
+  66%{opacity:.35}
 }
 .golem-card .armor-zone{color:inherit;text-align:start;cursor:pointer}
 .golem-card .armor-zone:focus-visible{outline:2px solid #e6b3ff;outline-offset:2px}
