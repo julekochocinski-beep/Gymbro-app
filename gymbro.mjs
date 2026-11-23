@@ -23,6 +23,9 @@ export const items=[
   {id:'bandana',name:'Czerwona bandana',slot:'Na ramię',category:'accessories',price:30,back:true},
   {id:'lancuch',name:'Złoty łańcuch',slot:'Na szyję',category:'accessories',price:50,back:true},
   {id:'okulary',name:'Fioletowe okulary',slot:'Na twarz',category:'accessories',price:40,back:false},
+  {id:'wrists-violet',sharedProduct:true,name:'Fioletowe owijki',slot:'Na nadgarstki',wearSlot:'wrists',category:'accessories',price:30,back:true},
+  {id:'belt-violet',sharedProduct:true,name:'Pas treningowy',slot:'Na pas',wearSlot:'waist',category:'accessories',price:50,back:true},
+  {id:'knees-violet',sharedProduct:true,name:'Fioletowe nakolanniki',slot:'Na kolana',wearSlot:'knees',category:'accessories',price:40,back:true},
   ...tattooItems,
 ];
 

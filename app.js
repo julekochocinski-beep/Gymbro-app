@@ -10,6 +10,7 @@ import {catalog,categories,exerciseKey,localizedExerciseLabel as exerciseLabel,e
 import {estimateOneRepMax,exerciseWeightTrend,filterSessions,latestMuscleWorkout,monthGrid,moveMonth,progressionAdvice,weeklyProgress} from './progress.mjs';
 import {instagramHandle,publicProfile} from './profile-extras.mjs';
 import {workoutCardBlob} from './share-card.mjs';
+import {finishedSavedPlan,missionDefinitions,personalMissions} from './missions.mjs';
 import {armorCount,clanCodeFromSearch,clanInviteUrl,golemArt} from './golem-view.mjs';
 import {MISSION_COINS,SEASON_COINS,GOLEM_COINS,GOLEM_GOAL,golemZones,weeklyMissions,golemWorkout,sendGolemWorkout,golemSnapshot,memberArtifacts} from './challenges.mjs';
 import {previewFrames} from './exercise-preview.mjs';
@@ -253,11 +254,11 @@ function sessionRows(sessions){
 function currentProgress(){
   const now=Date.now();
   const award=ownGolemAward();
-  const gameCoins=(award?.wins??0)*GOLEM_COINS+(award?.seasonWins??0)*SEASON_COINS;
-  const key=[data.sessions.length,data.wardrobe.owned.length,data.wardrobe.ownedBackgrounds.length,dayKey(now),data.weeklyMissionStart,data.xpBaseline.level,data.xpBaseline.through,data.xpBaseline.inLevel,gameCoins].join('|');
+  const gameCoins=(award?.wins??0)*GOLEM_COINS+(award?.seasonWins??0)*SEASON_COINS+(award?.missions?.earned??0);
+  const key=[data.sessions.length,data.wardrobe.owned.length,data.wardrobe.ownedBackgrounds.length,dayKey(now),data.weeklyMissionStart,data.xpBaseline.level,data.xpBaseline.through,data.xpBaseline.inLevel,JSON.stringify(data.custom),gameCoins].join('|');
   if(key!==progressCacheKey){
     const mission=weeklyMissions(data.sessions,data.weeklyMissionStart,now);
-    progressCache=progression(data.sessions,data.wardrobe,data.xpBaseline,now,mission.earned+gameCoins);
+    progressCache=progression(data.sessions,data.wardrobe,data.xpBaseline,now,mission.earned+personalMissions(data.sessions,data.custom,now).earned+gameCoins);
     progressCacheKey=key;
   }
   return progressCache;
@@ -354,7 +355,7 @@ function wardrobeItem(item,coins){
   const wearing=worn.includes(item.id);
   const trying=tryOn?.id===item.id;
   const attr=' type="button" data-key="'+item.id+'"';
-  return '<article class="outfit-row"><div class="outfit-thumb"><img src="'+activeModel().root+'ubrania/produkt-'+(item.art??item.id)+'.webp" data-item="'+item.id+'" alt=""></div>'+
+  return '<article class="outfit-row"><div class="outfit-thumb"><img src="'+(item.sharedProduct?'assets/':activeModel().root)+'ubrania/produkt-'+(item.art??item.id)+'.webp" data-item="'+item.id+'" alt=""></div>'+
     '<div class="outfit-description"><h3>'+t(item.name)+'</h3><span class="meta">'+t(item.slot)+(wearing?' '+t('· Założone'):fits?' '+t('· Kupione'):'')+'</span>'+
     '<div class="outfit-actions">'+(fits?'<button class="btn ghost" data-act="outfit-toggle"'+attr+' aria-label="'+(wearing?t('Zdejmij')+' ':t('Załóż')+' ')+t(item.name)+'">'+(wearing?t('Zdejmij'):t('Załóż'))+'</button>':
       '<button class="btn ghost" data-act="outfit-try"'+attr+' aria-pressed="'+trying+'" aria-label="'+t('Przymierz:')+' '+t(item.name)+'">'+(trying?t('Zakończ podgląd'):t('Przymierz'))+'</button>'+
@@ -550,12 +551,13 @@ function showHome(){
     '<section class="card card-list"><div class="card-head"><h3>'+t('Ostatni trening')+'</h3>'+link('Progress','historia','link','arrow')+'</div>'+
     sessionRows(data.sessions.slice(0,1))+'</section></div>';
 }
-function missionCard(title,task,count,unit,coins,dates='',extra=''){
+function missionCard(title,task,count,unit,coins,dates='',extra='',goal=2,done=count>=goal){
+  count=Math.min(goal,count);
   return '<section class="card card-pad challenge-card"><div class="card-head"><div><h2>'+title+'</h2>'+
     (dates?'<p class="meta">'+dates+'</p>':'')+'<p class="meta">'+task+'</p></div>'+coinBalance(coins)+'</div>'+
-    '<p class="challenge-status"><strong>'+count+'/2 '+unit+'</strong>'+
-    (count===2?'<span>'+icon('check')+' '+t('Nagroda przyznana')+'</span>':'')+'</p>'+
-    '<progress value="'+count+'" max="2" aria-label="'+title+'"></progress>'+extra+'</section>';
+    '<p class="challenge-status"><strong>'+count+'/'+goal+' '+unit+'</strong>'+
+    (done?'<span>'+icon('check')+' '+t('Nagroda przyznana')+'</span>':'')+'</p>'+
+    '<progress value="'+count+'" max="'+goal+'" aria-label="'+title+'"></progress>'+extra+'</section>';
 }
 function showMissions(){
   const {count}=weeklyMissions(data.sessions,data.weeklyMissionStart);
@@ -568,10 +570,20 @@ function showMissions(){
     (!currentUser?link(t('Zaloguj się'),'ustawienia','btn ghost'):''));
   const weekly=missionCard(t('Misja tygodniowa'),t('Zapisz trening w dwa różne dni tego tygodnia.'),
     count,t('dni treningowych'),MISSION_COINS);
+  const personal=personalMissions(data.sessions,data.custom).current;
+  const clan=award?.missions;
+  const additional=missionDefinitions.filter(mission=>mission.period===missionTab).map(({id,title,task,goal,coins})=>{
+    const count=clan?.[id]??personal[id]??0;
+    const done=id==='crew'?clan?.crewDone===true:count>=goal;
+    const clanMission=id==='crew'||id==='zones';
+    const extra=clanMission&&!currentUser?link(t('Zaloguj się'),'ustawienia','btn ghost'):
+      id==='crew'&&count>=goal&&!done?'<p class="meta">'+t('Zadaj własne trafienie, aby odebrać nagrodę.')+'</p>':'';
+    return missionCard(t(title),t(task),count,'',coins,missionTab==='seasonal'?dates:'',extra,goal,done);
+  }).join('');
   return heading(t('Misje'),'',link(t('Dom'),'dom','btn ghost','home'))+
     '<div class="stack"><div class="social-tabs">'+segment(t('Misje'),missionTab,
       [['weekly',t('Tygodniowe')],['seasonal',t('Sezonowe')]],'mission-tab')+'</div>'+
-    (missionTab==='seasonal'?seasonal:weekly)+'</div>';
+    (missionTab==='seasonal'?seasonal:weekly)+additional+'</div>';
 }
 function ownGolemAward(){
   const award=data.golemAward;
@@ -1807,7 +1819,14 @@ function assign(name){
     '<p class="meta">'+t('Zaznacz co najmniej jedną główną partię.')+'</p><div class="assignment-options">'+Object.entries(muscles).map(([key,label])=>
     '<label><input type="checkbox" name="muscle" value="'+key+'">'+esc(t(label))+'</label>').join('')+'</div><button class="btn primary" type="submit">'+t('Zapisz przypisanie')+'</button></form>');
 }
-function start(name,exercises){data.draft=newDraft(name,Date.now(),exercises);save();render();window.scrollTo(0,0);}
+function start(name,exercises,savedPlan=false){
+  data.draft=newDraft(name,Date.now(),exercises);
+  if(savedPlan){
+    data.draft.planTargets=data.draft.exercises.map(({label,setCount})=>({label,setCount}));
+    data.draft.exercises.forEach((exercise,index)=>{exercise.savedPlanIndex=index;});
+  }
+  save();render();window.scrollTo(0,0);
+}
 function editPlan(plan={id:null,name:'',exercises:[]}){
   planEdit={...plan,exercises:plan.exercises.map(exerciseConfig)};
   render();
@@ -2076,7 +2095,7 @@ function toggleSet(exercise,set,button){
 function finish(){
   const draft=data.draft;
   if(!draft||!completedCount(draft)) return;
-  const session={id:draft.id,name:draft.name,started:draft.started,finished:Date.now(),exercises:draft.exercises
+  const session={id:draft.id,name:draft.name,started:draft.started,finished:Date.now(),finishedSavedPlan:finishedSavedPlan(draft),exercises:draft.exercises
     .map(e=>({...e,sets:numberedCompletedSets(e.sets)})).filter(e=>e.sets.length)};
   const before=currentProgress();
   data.sessions.unshift(session);
@@ -2530,7 +2549,7 @@ document.addEventListener('click',async event=>{
     case 'configure-template':editPlan({id:null,name:key,exercises:plans[key],quick:true});break;
     case 'start-plan':{
       const plan=data.savedPlans.find(p=>p.id===key);
-      if(plan&&!data.draft) start(plan.name,plan.exercises);
+      if(plan&&!data.draft) start(plan.name,plan.exercises,true);
       break;
     }
     case 'new-plan':editPlan();break;
@@ -2657,6 +2676,7 @@ async function loadCloudData(){
     const queued=[...(prof.app_data.golemOutbox??[]),...data.golemOutbox].filter(workout=>workout.owner===user.id);
     data={...data,...prof.app_data,wardrobe:wardrobeFrom(prof.app_data.wardrobe??data.wardrobe)};
     delete data.skinPreview;
+    progressCacheKey=undefined;
     data.golemOutbox=[...new Map(queued.map(workout=>[workout.id,workout])).values()];
     savedRestPushSignature=restPushSignature(data.draft?.rest);
     localStorage.setItem(storage,JSON.stringify(data));
