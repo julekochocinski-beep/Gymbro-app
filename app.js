@@ -905,10 +905,43 @@ function clanMessages(fresh=new Set()){
     return '<article class="clan-message clan-activity">'+meta+'<p class="clan-activity-text">'+icon(item.kind==='level'?'bolt':'dumbbell')+info+'</p>'+workoutLink+'</article>';
   }).join('');
 }
+// This screen belongs to the preview-only branch. It never reads or updates clan scores.
+const golemTestStages=Array.from({length:GOLEM_GOAL+1},(_,step)=>[String(step),step+'/'+GOLEM_GOAL]);
+const golemTest={side:'front',hits:{chest:0,back:0,legs:0}};
+function showGolemTest(){
+  const values=Object.values(golemTest.hits);
+  const all=values.every(value=>value===values[0])?values[0]:null;
+  return heading(t('Test pancerza Golema'),t('Wybierz etap dla całej zbroi lub dla jednej strefy.'))+
+    '<section class="card card-pad stack golem-test">'+golemArt(golemTest,golemTest.side,GOLEM_GOAL)+
+    segment(t('Widok Golema'),golemTest.side,[['front',t('Przód')],['back',t('Tył')]],'golem-test-side')+
+    Object.entries({all:'Cały pancerz',...golemZones}).map(([zone,label])=>{
+      const active=zone==='all'?all:golemTest.hits[zone];
+      return '<div class="golem-test-zone"><strong>'+t(label)+'</strong>'+
+        segment(t(label),String(active),golemTestStages,'golem-test-'+zone)+'</div>';
+    }).join('')+'</section>';
+}
+function changeGolemTest(control,key){
+  if(control==='side'){
+    if(key!=='front'&&key!=='back') return;
+    golemTest.side=key;
+  }else{
+    const step=Number(key);
+    if(!golemTestStages.some(([value])=>value===key)) return;
+    if(control==='all'){
+      for(const zone of Object.keys(golemTest.hits)) golemTest.hits[zone]=step;
+    }else if(Object.hasOwn(golemTest.hits,control)){
+      golemTest.hits[control]=step;
+      if(control!=='legs') golemTest.side=control==='back'?'back':'front';
+    }else return;
+  }
+  render();
+  app.querySelector('[data-act="golem-test-'+control+'"][data-key="'+key+'"]')?.focus({preventScroll:true});
+}
 function clanGolemCard(){
   const battle=golemBattle?.clan===clanState?.clan?.id?golemBattle:null;
   const header='<div class="card-head"><div><h2>'+t('Golem Kuźni')+'</h2><p class="meta">'+t('Tygodniowa walka klanu')+'</p></div><span class="golem-icon">'+icon(battle?.won?'trophy':'shield')+'</span></div>';
-  if(!battle) return header+'<p class="meta" role="status">'+t(golemError?'Walka klanu jest chwilowo niedostępna.':'Ładowanie walki klanu…')+'</p>';
+  const testLink=link(t('Testuj pancerz'),'test-golema','btn ghost full');
+  if(!battle) return header+'<p class="meta" role="status">'+t(golemError?'Walka klanu jest chwilowo niedostępna.':'Ładowanie walki klanu…')+'</p>'+testLink;
   const waiting=battle.eligible===false&&battle.eligibleFrom;
   const hint=waiting?t('Do walki i nagród dołączysz od {date}.')
     .replace('{date}',()=>fullDayFormatter.format(dateForKey(battle.eligibleFrom))):
@@ -923,7 +956,7 @@ function clanGolemCard(){
       '<span>'+t(label)+'</span><strong>'+count+'/'+GOLEM_GOAL+'</strong>'+
       '<progress value="'+count+'" max="'+GOLEM_GOAL+'" aria-hidden="true"></progress></button>';
   }).join('')+'</div><p class="meta'+(waiting?' golem-waiting':'')+'">'+hint+'</p><p class="meta">'+GOLEM_COINS+' '+t('monet i trofeum za udział w zwycięstwie.')+
-    '</p>'+action(t('Heatmapa klanu'),'clan-heatmap','ghost full','flame');
+    '</p>'+action(t('Heatmapa klanu'),'clan-heatmap','ghost full','flame')+testLink;
 }
 function updateClanGolemCard(){
   const panel=app.querySelector('#clan-golem');
@@ -1467,7 +1500,7 @@ async function submitNickname(form,button,nick){
   }
 }
 const views={dom:showHome,trening:showTraining,klan:showSocial,gymbro:showGymBro,mapa:showMap,historia:showProgress,
-  ustawienia:showSettings,misje:showMissions,artefakty:showArtifacts};
+  ustawienia:showSettings,misje:showMissions,artefakty:showArtifacts,'test-golema':showGolemTest};
 function renderAccount(){
   document.querySelector('#account-tools').innerHTML=accountTools();
 }
@@ -2397,6 +2430,13 @@ document.addEventListener('click',async event=>{
       socialTab='klan';
       go('klan');
       requestAnimationFrame(()=>app.querySelector('#clan-golem')?.scrollIntoView({block:'start'}));
+      break;
+    case 'golem-test-side':
+    case 'golem-test-all':
+    case 'golem-test-chest':
+    case 'golem-test-back':
+    case 'golem-test-legs':
+      if(route()==='test-golema') changeGolemTest(act.slice('golem-test-'.length),key);
       break;
     case 'golem-zone':
     case 'golem-side': {

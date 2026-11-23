@@ -687,3 +687,6 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .golem-workout{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .clan-invite-actions{display:flex;flex-wrap:wrap;gap:6px}
 .clan-invite:has(.clan-invite-actions){flex-wrap:wrap}
+
+.golem-test-zone{display:grid;gap:4px}
+.golem-test-zone .segmented{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}

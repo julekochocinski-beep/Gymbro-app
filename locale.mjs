@@ -4,6 +4,10 @@ export const uiLocale=()=>language==='en'?'en-GB':'pl-PL';
 export const t=text=>language==='en'&&Object.hasOwn(english,text)?english[text]:text;
 
 const english={
+  "Testuj pancerz": "Test armor",
+  "Test pancerza Golema": "Golem armor test",
+  "Wybierz etap dla całej zbroi lub dla jednej strefy.": "Choose a stage for the whole suit of armor or a single zone.",
+  "Cały pancerz": "All armor",
   "Widok Golema": "Golem view",
   "Zobacz postęp walki": "View battle progress",
   "Zostań przy {kg} kg i spróbuj zrobić {reps} powtórzeń w serii nr {set}.": "Stay at {kg} kg and try {reps} reps in set {set}.",
