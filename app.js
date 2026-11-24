@@ -513,7 +513,7 @@ function updateRestPushSettings(){
 function showSettings(){
   const values=data.measurements;
   return heading(t('Ustawienia'),'')+'<div class="stack">'+
-    '<section class="card card-pad stack"><h2>Konto w chmurze (Supabase)</h2>'+
+    '<section class="card card-pad stack"><h2>'+t('Konto w chmurze')+'</h2>'+
     (currentUser?'<p class="meta">Zalogowano jako: <strong>'+esc(currentUser.email)+'</strong></p>'+action('Wyloguj się','auth-logout','ghost'):
     '<form id="auth-form" class="stack"><label class="field">E-mail<input type="email" name="email" required placeholder="twoj@email.pl"></label>'+
     '<label class="field">Hasło (min. 6 znaków)<input type="password" name="password" minlength="6" required placeholder="••••••"></label>'+
@@ -948,6 +948,140 @@ function openClanMuscle(key){
     '<p class="meta">'+t('Nikt z klanu nie trenował tej partii w tym tygodniu.')+'</p>')+
     action(t('Wróć do heatmapy'),'clan-heatmap','ghost full')+'</div>');
 }
+function clanDirectoryButton(){
+  return action(t('Ranking i szukaj klanu'),'clan-directory','ghost full','trophy');
+}
+function clanListingControl(){
+  const clan=clanState?.clan;
+  if(!clan||clan.ownerId!==clanState.self) return '';
+  return action(t(clan.listed?'Ukryj klan w katalogu':'Otwórz klan w katalogu'),'clan-listing','ghost full');
+}
+function openClanDirectory(search=''){
+  openModal(t('Ranking klanów'),
+    '<p class="meta">'+t('Tygodniowy ranking · 1 punkt za dzień treningu na osobę.')+'</p>'+
+    '<form id="clan-directory-search" class="clan-directory-search"><label class="field">'+t('Nazwa lub tag klanu')+
+      '<input name="search" maxlength="40" value="'+esc(search)+'"></label>'+
+      '<button type="submit" class="btn primary">'+t('Szukaj klanów')+'</button></form>'+
+    '<div id="clan-directory-results" class="stack" aria-live="polite"></div>');
+  loadClanDirectory(search);
+}
+async function loadClanDirectory(search){
+  const result=dialog.querySelector('#clan-directory-results');
+  const button=dialog.querySelector('#clan-directory-search button');
+  button.disabled=true;
+  result.textContent=t('Ładowanie rankingu…');
+  try{
+    const clans=await clanRequest({action:'directory',search});
+    if(!dialog.open||!dialog.contains(result)) return;
+    result.innerHTML=clans.length?clans.map(clan=>
+      '<button type="button" class="clan-directory-row" data-act="clan-directory-detail" data-key="'+esc(clan.id)+'">'+
+      '<span class="clan-directory-rank">#'+clan.place+'</span>'+
+      '<span class="row-main"><strong>['+esc(clan.tag)+'] '+esc(clan.name)+'</strong>'+
+      '<small class="meta">'+t('Członkowie')+' · '+clan.members+'/'+clan.capacity+'</small></span>'+
+      '<span class="clan-directory-score">'+clan.points+' '+t('pkt')+'</span>'+icon('chevron')+'</button>'
+    ).join(''):'<p class="empty">'+t('Brak klanów do wyświetlenia.')+'</p>';
+  }catch(error){
+    result.textContent=error.message;
+  }finally{
+    button.disabled=false;
+  }
+}
+async function openClanDirectoryDetail(id,search='',friendId=''){
+  const back=friendId?friendButton('friend-profile',friendId,t('Wróć')):friendButton('clan-directory',search,t('Wróć'));
+  openModal(t('Klan'),'<div id="clan-directory-detail" class="stack" role="status">'+t('Ładowanie klanu…')+'</div>');
+  const content=dialog.querySelector('#clan-directory-detail');
+  Object.assign(content.dataset,{clanId:id,search,friendId});
+  try{
+    const clan=await clanRequest({action:'directory-detail',clanId:id});
+    if(!dialog.open||!dialog.contains(content)) return;
+    if(!clan) throw Error(t('Ten klan jest już niedostępny w katalogu.'));
+    const full=clan.members.length>=clan.capacity;
+    const message=clan.viewerClan===id?'To Twój klan.':clan.viewerClan?'Najpierw opuść obecny klan.':
+      full?'Ten klan jest pełny.':!nickname?'Ustaw nick, zanim dołączysz do klanu.':'';
+    content.removeAttribute('role');
+    content.innerHTML='<h3>['+esc(clan.tag)+'] '+esc(clan.name)+'</h3>'+
+      '<p class="meta">'+t('Członkowie')+' · '+clan.members.length+'/'+clan.capacity+'</p>'+
+      '<ul class="clan-directory-roster">'+clan.members.map(member=>'<li>'+
+      '<button type="button" class="clan-directory-row" data-act="clan-directory-member" data-key="'+esc(member.id)+'">'+
+      '<span class="row-main"><strong>'+esc(member.nick)+'</strong><small class="meta">'+t('Poziom')+' '+member.level+
+      (member.leader?' · '+t('Lider'):'')+'</small></span>'+icon('chevron')+'</button></li>').join('')+'</ul>'+
+      (message?'<p class="meta">'+t(message)+'</p>':
+        '<p class="meta">'+t('Członkowie zobaczą Twój profil i szczegóły pięciu ostatnich treningów. Zapis treningu i nowe PR-y pojawią się na czacie klanu.')+'</p>')+
+      '<p class="form-error" role="alert" hidden></p><div class="controls">'+back+
+      (message?'':friendButton('clan-directory-join',id,t('Dołącz do klanu'),'primary'))+'</div>';
+  }catch(error){
+    content.innerHTML='<p class="form-error">'+esc(error.message)+'</p>'+back;
+  }
+}
+async function openDirectoryMember(id){
+  const {clanId,search,friendId}=dialog.querySelector('#clan-directory-detail').dataset;
+  const back=friendButton('clan-directory-return',clanId,t('Wróć do klanu'));
+  const markup='<div id="directory-member" data-search="'+esc(search)+'" data-friend-id="'+esc(friendId)+'">';
+  openModal(t('Profil gracza'),markup+'<p role="status">'+t('Ładowanie profilu…')+'</p></div>'+back);
+  const panel=dialog.querySelector('#directory-member');
+  try{
+    const member=await clanRequest({action:'directory-member',clanId,memberId:id});
+    if(!dialog.open||!dialog.contains(panel)) return;
+    if(!member) throw Error(t('Profil gracza jest niedostępny.'));
+    openModal(esc(member.nick),markup+'<p class="meta">'+t('Poziom')+' '+member.level+'</p>'+
+      '<div class="buddy-stage clan-profile-stage" data-background="'+backgroundId(member.background)+
+      '" style="'+modelMotionStyle()+'">'+profileAvatar(member)+'</div>'+liftCards(member.best)+'</div>'+back);
+  }catch(error){
+    if(dialog.open&&dialog.contains(panel)) panel.innerHTML='<p class="form-error">'+esc(error.message)+'</p>';
+  }
+}
+async function joinClanFromDirectory(id,button){
+  if(button.disabled) return;
+  const errorBox=dialog.querySelector('#clan-directory-detail [role="alert"]');
+  const userId=currentUser?.id;
+  button.disabled=true;
+  clanVersion++;
+  try{
+    const snapshot=await clanRequest({action:'join-directory',clanId:id});
+    if(currentUser?.id!==userId) return;
+    clanVersion++;
+    if(dialog.open&&dialog.contains(button)) dialog.close();
+    socialTab='klan';
+    applyClan(snapshot);
+    render();
+    refreshClan();
+    toast(t('Dołączono do klanu.'));
+  }catch(error){
+    errorBox.textContent=error.message;
+    errorBox.hidden=false;
+  }finally{
+    button.disabled=false;
+  }
+}
+function confirmClanListing(){
+  const clan=clanState?.clan;
+  if(!clan||clan.ownerId!==clanState.self) return;
+  openModal(t(clan.listed?'Ukryj klan w katalogu':'Otwórz klan w katalogu'),
+    '<p class="meta">'+t(clan.listed?'Klan zniknie z rankingu. Link i kod zaproszenia nadal będą działać.':
+      'Zalogowani gracze zobaczą nazwę klanu, nicki, poziomy, postacie GymBro i rekordy członków. Będą mogli dołączyć bez zaproszenia.')+'</p>'+
+    '<p class="form-error" id="clan-listing-error" role="alert" hidden></p>'+
+    '<div class="controls">'+action(t('Wróć'),'close')+action(t('Zapisz'),'clan-listing-save','primary')+'</div>');
+}
+async function saveClanListing(button){
+  const clan=clanState?.clan;
+  if(button.disabled||!clan||clan.ownerId!==clanState.self) return;
+  const errorBox=dialog.querySelector('#clan-listing-error');
+  button.disabled=true;
+  try{
+    const listed=await clanRequest({action:'set-listed',clanId:clan.id,listed:!clan.listed});
+    if(clanState?.clan?.id!==clan.id) return;
+    clanVersion++;
+    clanState.clan.listed=listed;
+    if(dialog.open&&dialog.contains(button)) dialog.close();
+    const control=app.querySelector('#clan-listing-control');
+    if(control) control.innerHTML=clanListingControl();
+  }catch(error){
+    errorBox.textContent=error.message;
+    errorBox.hidden=false;
+  }finally{
+    button.disabled=false;
+  }
+}
 function showClan(){
   if(inviteCode&&!currentUser) return '<section class="card card-pad stack"><h2>'+t('Zaproszenie do klanu')+'</h2>'+
     '<p class="meta">'+t('Zaloguj się do GymBro lub załóż konto, żeby dołączyć do klanu.')+'</p>'+
@@ -956,7 +1090,7 @@ function showClan(){
     (clanError?action(t('Spróbuj ponownie'),'clan-retry','ghost'):'')+'</section>';
   if(!clanState.clan){
     const create=clanMode==='create';
-    return '<section class="card card-pad stack">'+segment(t('Dołącz lub utwórz klan'),clanMode,[['create',t('Utwórz klan')],['join',t('Dołącz przez kod')]],'clan-mode')+
+    return '<section class="card card-pad stack">'+clanDirectoryButton()+segment(t('Dołącz lub utwórz klan'),clanMode,[['create',t('Utwórz klan')],['join',t('Dołącz przez kod')]],'clan-mode')+
       '<div data-clan-nick '+(nickname?'hidden':'')+'>'+action(t('Ustaw nick'),'edit-nickname','ghost','edit')+'</div>'+
       '<form id="clan-start" class="stack">'+
       (create?'<label class="field">'+t('Nazwa klanu')+'<input name="name" required minlength="2" maxlength="40" placeholder="'+t('np. Żelazne Słonie')+'"></label>'+
@@ -966,7 +1100,7 @@ function showClan(){
       '<p class="form-error" id="clan-start-error" role="alert" hidden></p><button class="btn primary" type="submit"'+(!nickname?' disabled':'')+'>'+(create?t('Utwórz klan'):t('Dołącz do klanu'))+'</button></form></section>';
   }
   const {tag,name,code}=clanState.clan;
-  return '<div class="stack"><section class="card card-pad clan-invite">'+
+  return '<div class="stack">'+clanDirectoryButton()+'<section class="card card-pad clan-invite">'+
     '<div><h2><em>['+esc(tag)+']</em> '+esc(name)+'</h2><span class="meta">'+t('Kod zaproszenia')+'</span><strong>'+esc(code)+'</strong></div>'+'<div class="clan-invite-actions">'+action(t('Udostępnij link'),'clan-share','primary')+action(t('Kopiuj kod'),'clan-copy','ghost')+'</div></section>'+
     '<section id="clan-golem" class="card card-pad challenge-card golem-card">'+clanGolemCard()+'</section>'+
     '<details class="card card-pad clan-roster"><summary><strong>'+t('Członkowie')+'</strong><span class="clan-roster-count" id="clan-member-count">'+clanState.members.length+'</span>'+icon('chevron')+'</summary>'+
@@ -975,7 +1109,7 @@ function showClan(){
     '<div id="clan-feed" class="clan-feed" role="log" aria-label="'+t('Wiadomości i aktywności klanu')+'">'+clanMessages()+'</div>'+
     '<form id="clan-chat" class="clan-compose"><label class="field">'+t('Wiadomość')+'<input name="message" maxlength="500" required autocomplete="off" placeholder="'+t('Napisz do klanu')+'"></label>'+
     '<button class="btn primary" type="submit">'+t('Wyślij')+'</button></form></section>'+
-    action(t('Opuść klan'),'clan-leave','ghost')+'</div>';
+    '<div id="clan-listing-control">'+clanListingControl()+'</div>'+action(t('Opuść klan'),'clan-leave','ghost')+'</div>';
 }
 function openClanMember(id){
   const member=clanState?.members?.find(entry=>entry.id===id);
@@ -1045,6 +1179,8 @@ function applyClan(snapshot,scrollToEnd=false){
     return;
   }
   if(!clanId) return;
+  const listing=app.querySelector('#clan-listing-control');
+  if(listing&&previous.clan.listed!==snapshot.clan.listed) listing.innerHTML=clanListingControl();
   const members=app.querySelector('#clan-member-list');
   if(members&&(previous.week!==snapshot.week||JSON.stringify(previous.members)!==JSON.stringify(snapshot.members))){
     app.querySelector('#clan-member-count').textContent=snapshot.members.length;
@@ -1288,7 +1424,8 @@ async function loadProfileArtifacts(memberId){
 }
 function openFriend(id){
   const friend=friendsState?.friends.find(person=>person.id===id);
-  if(friend) openMemberProfile(friend,'friends','',friendButton('friend-confirm-remove',id,t('Usuń ze znajomych'),'danger'));
+  if(friend) openMemberProfile(friend,'friends','',
+    (friend.clanId?friendButton('friend-clan',id,t('Zobacz klan znajomego'),'ghost full'):'')+friendButton('friend-confirm-remove',id,t('Usuń ze znajomych'),'danger'));
 }
 function copySharedPlan(peerId,planId){
   const friend=friendsState?.friends.find(person=>person.id===peerId);
@@ -2253,6 +2390,7 @@ document.addEventListener('submit',async event=>{
   if(form.id==='friends-setup') modifyFriends({action:'setup'},event.submitter);
   if(form.id==='friends-invite') modifyFriends({action:'invite',code:fields.get('code')},event.submitter)
     .then(sent=>{if(sent){form.reset();toast(t('Zaproszenie wysłane'));}});
+  if(form.id==='clan-directory-search') loadClanDirectory(fields.get('search').trim());
   if(form.id==='clan-start') submitClanStart(form,fields);
   if(form.id==='clan-chat') sendClanChat(form,fields);
   if(form.id==='plan-form') submitPlan(form,event.submitter?.value);
@@ -2370,6 +2508,20 @@ document.addEventListener('click',async event=>{
       if(friendsState?.self){data.friendsId=friendsState.self.id;lastFriendsProfile='';save();render();refreshFriends();}
       break;
     case 'friend-profile':openFriend(key);break;
+    case 'friend-clan':{
+      const friend=friendsState?.friends.find(person=>person.id===key);
+      if(!friend?.clanId) break;
+      if(friend.clanId===data.clanLink){
+        dialog.close();socialTab='klan';render();refreshClan();
+      }else openClanDirectoryDetail(friend.clanId,'',key);
+      break;
+    }
+    case 'clan-directory-member':openDirectoryMember(key);break;
+    case 'clan-directory-return':{
+      const {search,friendId}=dialog.querySelector('#directory-member').dataset;
+      openClanDirectoryDetail(key,search,friendId);
+      break;
+    }
     case 'copy-shared-plan':copySharedPlan(button.dataset.peer,key);break;
     case 'friend-accept':modifyFriends({action:'accept',peer:key},button);break;
     case 'friend-decline':modifyFriends({action:'decline',peer:key},button);break;
@@ -2380,6 +2532,11 @@ document.addEventListener('click',async event=>{
       break;
     case 'friend-remove-confirmed':
       dialog.close();modifyFriends({action:'remove',peer:key});break;
+    case 'clan-directory':openClanDirectory(key||'');break;
+    case 'clan-directory-detail':openClanDirectoryDetail(key,dialog.querySelector('#clan-directory-search').elements.search.value.trim());break;
+    case 'clan-directory-join':joinClanFromDirectory(key,button);break;
+    case 'clan-listing':confirmClanListing();break;
+    case 'clan-listing-save':saveClanListing(button);break;
     case 'clan-mode':clanMode=key;render();break;
     case 'clan-retry':refreshClan();break;
     case 'open-golem':

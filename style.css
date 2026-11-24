@@ -685,3 +685,12 @@ body:has(.rest-dock:not([hidden])) #record,body:has(.rest-dock:not([hidden])) #t
 .golem-workout{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .clan-invite-actions{display:flex;flex-wrap:wrap;gap:6px}
 .clan-invite:has(.clan-invite-actions){flex-wrap:wrap}
+
+.clan-directory-search{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}
+.clan-directory-row{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#211729}
+.clan-directory-row{text-align:left;color:inherit;cursor:pointer;font:inherit}
+.clan-directory-row .row-main{flex:1;min-width:0;overflow-wrap:anywhere}
+.clan-directory-row .row-main small{display:block}
+.clan-directory-rank,.clan-directory-score{color:#e1a4ff;white-space:nowrap;font-weight:700}
+.clan-directory-roster{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+#clan-listing-control:empty{display:none}
