@@ -108,6 +108,7 @@ function mapMember(p) {
   return {
     id: p.id,
     nick: p.username,
+    clanId: p.clan_id ?? null,
     level: p.level ?? 1,
     worn: p.worn ?? [],
     tattoos: tattoosFrom(p.app_data?.wardrobe?.tattoos),
@@ -188,6 +189,14 @@ function clanDirectoryError(error) {
 export async function clanRequest(payload) {
   const user = await getUser();
   if (!payload) return buildClanSnapshot(user.id);
+
+  if (payload.action === 'directory-member') {
+    const { data, error } = await supabase.rpc('gymbro_clan_directory_member', {
+      p_clan_id: payload.clanId, p_member_id: payload.memberId,
+    });
+    if (error) throw clanDirectoryError(error);
+    return data ? mapMember(data) : null;
+  }
 
   if (payload.action === 'directory' || payload.action === 'directory-detail' || payload.action === 'set-listed') {
     const { data, error } = await (payload.action === 'directory'
