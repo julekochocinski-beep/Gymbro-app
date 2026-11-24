@@ -164,7 +164,7 @@ async function buildClanSnapshot(userId) {
   return {
     self: userId,
     week,
-    clan: { id: clan.id, name: clan.name, tag: clan.tag, code: clan.code, ownerId: clan.owner_id },
+    clan: { id: clan.id, name: clan.name, tag: clan.tag, code: clan.code, ownerId: clan.owner_id, listed: Boolean(clan.listed) },
     members: (members ?? []).map(mapMember),
     messages: (msgs ?? []).reverse().map((m, idx) => ({
       seq: idx + 1,
@@ -179,9 +179,35 @@ async function buildClanSnapshot(userId) {
   };
 }
 
+function clanDirectoryError(error) {
+  if (error.message === 'clan_full') return Error(t('Ten klan jest pełny.'));
+  if (error.code === 'PGRST202') return Error(t('Katalog klanów jest chwilowo niedostępny.'));
+  return Error(t('Nie udało się wykonać operacji. Spróbuj ponownie.'));
+}
+
 export async function clanRequest(payload) {
   const user = await getUser();
   if (!payload) return buildClanSnapshot(user.id);
+
+  if (payload.action === 'directory' || payload.action === 'directory-detail' || payload.action === 'set-listed') {
+    const { data, error } = await (payload.action === 'directory'
+      ? supabase.rpc('gymbro_clan_directory', { p_search: payload.search })
+      : payload.action === 'directory-detail'
+        ? supabase.rpc('gymbro_clan_directory_detail', { p_clan_id: payload.clanId })
+        : supabase.rpc('gymbro_set_clan_listed', { p_clan_id: payload.clanId, p_listed: payload.listed }));
+    if (error) throw clanDirectoryError(error);
+    return data;
+  }
+
+  if (payload.action === 'join-directory') {
+    const { data, error } = await supabase.rpc('gymbro_join_listed_clan', { p_clan_id: payload.clanId });
+    if (error) throw clanDirectoryError(error);
+    if (data !== 'joined') throw Error(t({
+      already_in_clan: 'Najpierw opuść obecny klan.',
+      profile_required: 'Ustaw nick, zanim dołączysz do klanu.',
+    }[data] || 'Ten klan jest już niedostępny w katalogu.'));
+    return buildClanSnapshot(user.id);
+  }
 
   if (payload.action === 'create') {
     const code = randomCode(6);
@@ -191,14 +217,16 @@ export async function clanRequest(payload) {
       .select()
       .single();
     if (error) throw Error(t('Nie udało się utworzyć klanu (sprawdź, czy nazwa lub tag nie są zajęte).'));
-    await supabase.from('profiles').update({ clan_id: clan.id }).eq('id', user.id);
+    const { error: membershipError } = await supabase.from('profiles').update({ clan_id: clan.id }).eq('id', user.id);
+    if (membershipError) throw clanDirectoryError(membershipError);
     return buildClanSnapshot(user.id);
   }
 
   if (payload.action === 'join') {
     const { data: clan } = await supabase.from('clans').select('id').eq('code', payload.code.trim().toUpperCase()).maybeSingle();
     if (!clan) throw Error(t('Nie znaleziono klanu o tym kodzie.'));
-    await supabase.from('profiles').update({ clan_id: clan.id }).eq('id', user.id);
+    const { error: membershipError } = await supabase.from('profiles').update({ clan_id: clan.id }).eq('id', user.id);
+    if (membershipError) throw clanDirectoryError(membershipError);
     return buildClanSnapshot(user.id);
   }
 
