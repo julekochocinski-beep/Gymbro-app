@@ -4,6 +4,11 @@ export const uiLocale=()=>language==='en'?'en-GB':'pl-PL';
 export const t=text=>language==='en'&&Object.hasOwn(english,text)?english[text]:text;
 
 const english={
+  "Profil gracza": "Player profile",
+  "Ładowanie profilu…": "Loading profile…",
+  "Profil gracza jest niedostępny.": "This player profile is unavailable.",
+  "Zobacz klan znajomego": "View friend’s clan",
+  "Konto w chmurze": "Cloud account",
   "Ranking i szukaj klanu": "Rankings and clan finder",
   "Ranking klanów": "Clan rankings",
   "pkt": "pts",
@@ -23,7 +28,7 @@ const english={
   "Katalog klanów jest chwilowo niedostępny.": "The clan directory is temporarily unavailable.",
   "Nie udało się wykonać operacji. Spróbuj ponownie.": "Something went wrong. Please try again.",
   "Klan zniknie z rankingu. Link i kod zaproszenia nadal będą działać.": "Your clan will disappear from the rankings. Invite links and codes will still work.",
-  "Zalogowani gracze zobaczą nazwę klanu, nicki i poziomy członków. Będą mogli dołączyć bez zaproszenia.": "Signed-in players will see the clan name and its members’ nicknames and levels. They can join without an invite.",
+  "Zalogowani gracze zobaczą nazwę klanu, nicki, poziomy, postacie GymBro i rekordy członków. Będą mogli dołączyć bez zaproszenia.": "Signed-in players will see the clan name and its members’ nicknames, levels, GymBro avatars and lift records. They can join without an invite.",
   "Trzy wejścia": "Three visits",
   "Zapisz trening w trzy różne dni tygodnia.": "Log a workout on three different days this week.",
   "Pełna heatmapa": "Full heatmap",

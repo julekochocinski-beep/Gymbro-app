@@ -513,7 +513,7 @@ function updateRestPushSettings(){
 function showSettings(){
   const values=data.measurements;
   return heading(t('Ustawienia'),'')+'<div class="stack">'+
-    '<section class="card card-pad stack"><h2>Konto w chmurze (Supabase)</h2>'+
+    '<section class="card card-pad stack"><h2>'+t('Konto w chmurze')+'</h2>'+
     (currentUser?'<p class="meta">Zalogowano jako: <strong>'+esc(currentUser.email)+'</strong></p>'+action('Wyloguj się','auth-logout','ghost'):
     '<form id="auth-form" class="stack"><label class="field">E-mail<input type="email" name="email" required placeholder="twoj@email.pl"></label>'+
     '<label class="field">Hasło (min. 6 znaków)<input type="password" name="password" minlength="6" required placeholder="••••••"></label>'+
@@ -986,28 +986,48 @@ async function loadClanDirectory(search){
     button.disabled=false;
   }
 }
-async function openClanDirectoryDetail(id,search){
+async function openClanDirectoryDetail(id,search='',friendId=''){
+  const back=friendId?friendButton('friend-profile',friendId,t('Wróć')):friendButton('clan-directory',search,t('Wróć'));
   openModal(t('Klan'),'<div id="clan-directory-detail" class="stack" role="status">'+t('Ładowanie klanu…')+'</div>');
   const content=dialog.querySelector('#clan-directory-detail');
-  const back=friendButton('clan-directory',search,t('Wróć'));
+  Object.assign(content.dataset,{clanId:id,search,friendId});
   try{
     const clan=await clanRequest({action:'directory-detail',clanId:id});
     if(!dialog.open||!dialog.contains(content)) return;
     if(!clan) throw Error(t('Ten klan jest już niedostępny w katalogu.'));
     const full=clan.members.length>=clan.capacity;
-    const message=clanState?.clan?.id===id?'To Twój klan.':clanState?.clan?'Najpierw opuść obecny klan.':
+    const message=clan.viewerClan===id?'To Twój klan.':clan.viewerClan?'Najpierw opuść obecny klan.':
       full?'Ten klan jest pełny.':!nickname?'Ustaw nick, zanim dołączysz do klanu.':'';
     content.removeAttribute('role');
     content.innerHTML='<h3>['+esc(clan.tag)+'] '+esc(clan.name)+'</h3>'+
       '<p class="meta">'+t('Członkowie')+' · '+clan.members.length+'/'+clan.capacity+'</p>'+
-      '<ul class="clan-directory-roster">'+clan.members.map(member=>'<li><strong>'+esc(member.nick)+'</strong>'+
-      '<span class="meta">'+t('Poziom')+' '+member.level+(member.leader?' · '+t('Lider'):'')+'</span></li>').join('')+'</ul>'+
+      '<ul class="clan-directory-roster">'+clan.members.map(member=>'<li>'+
+      '<button type="button" class="clan-directory-row" data-act="clan-directory-member" data-key="'+esc(member.id)+'">'+
+      '<span class="row-main"><strong>'+esc(member.nick)+'</strong><small class="meta">'+t('Poziom')+' '+member.level+
+      (member.leader?' · '+t('Lider'):'')+'</small></span>'+icon('chevron')+'</button></li>').join('')+'</ul>'+
       (message?'<p class="meta">'+t(message)+'</p>':
         '<p class="meta">'+t('Członkowie zobaczą Twój profil i szczegóły pięciu ostatnich treningów. Zapis treningu i nowe PR-y pojawią się na czacie klanu.')+'</p>')+
       '<p class="form-error" role="alert" hidden></p><div class="controls">'+back+
       (message?'':friendButton('clan-directory-join',id,t('Dołącz do klanu'),'primary'))+'</div>';
   }catch(error){
     content.innerHTML='<p class="form-error">'+esc(error.message)+'</p>'+back;
+  }
+}
+async function openDirectoryMember(id){
+  const {clanId,search,friendId}=dialog.querySelector('#clan-directory-detail').dataset;
+  const back=friendButton('clan-directory-return',clanId,t('Wróć do klanu'));
+  const markup='<div id="directory-member" data-search="'+esc(search)+'" data-friend-id="'+esc(friendId)+'">';
+  openModal(t('Profil gracza'),markup+'<p role="status">'+t('Ładowanie profilu…')+'</p></div>'+back);
+  const panel=dialog.querySelector('#directory-member');
+  try{
+    const member=await clanRequest({action:'directory-member',clanId,memberId:id});
+    if(!dialog.open||!dialog.contains(panel)) return;
+    if(!member) throw Error(t('Profil gracza jest niedostępny.'));
+    openModal(esc(member.nick),markup+'<p class="meta">'+t('Poziom')+' '+member.level+'</p>'+
+      '<div class="buddy-stage clan-profile-stage" data-background="'+backgroundId(member.background)+
+      '" style="'+modelMotionStyle()+'">'+profileAvatar(member)+'</div>'+liftCards(member.best)+'</div>'+back);
+  }catch(error){
+    if(dialog.open&&dialog.contains(panel)) panel.innerHTML='<p class="form-error">'+esc(error.message)+'</p>';
   }
 }
 async function joinClanFromDirectory(id,button){
@@ -1021,7 +1041,9 @@ async function joinClanFromDirectory(id,button){
     if(currentUser?.id!==userId) return;
     clanVersion++;
     if(dialog.open&&dialog.contains(button)) dialog.close();
+    socialTab='klan';
     applyClan(snapshot);
+    render();
     refreshClan();
     toast(t('Dołączono do klanu.'));
   }catch(error){
@@ -1036,7 +1058,7 @@ function confirmClanListing(){
   if(!clan||clan.ownerId!==clanState.self) return;
   openModal(t(clan.listed?'Ukryj klan w katalogu':'Otwórz klan w katalogu'),
     '<p class="meta">'+t(clan.listed?'Klan zniknie z rankingu. Link i kod zaproszenia nadal będą działać.':
-      'Zalogowani gracze zobaczą nazwę klanu, nicki i poziomy członków. Będą mogli dołączyć bez zaproszenia.')+'</p>'+
+      'Zalogowani gracze zobaczą nazwę klanu, nicki, poziomy, postacie GymBro i rekordy członków. Będą mogli dołączyć bez zaproszenia.')+'</p>'+
     '<p class="form-error" id="clan-listing-error" role="alert" hidden></p>'+
     '<div class="controls">'+action(t('Wróć'),'close')+action(t('Zapisz'),'clan-listing-save','primary')+'</div>');
 }
@@ -1402,7 +1424,8 @@ async function loadProfileArtifacts(memberId){
 }
 function openFriend(id){
   const friend=friendsState?.friends.find(person=>person.id===id);
-  if(friend) openMemberProfile(friend,'friends','',friendButton('friend-confirm-remove',id,t('Usuń ze znajomych'),'danger'));
+  if(friend) openMemberProfile(friend,'friends','',
+    (friend.clanId?friendButton('friend-clan',id,t('Zobacz klan znajomego'),'ghost full'):'')+friendButton('friend-confirm-remove',id,t('Usuń ze znajomych'),'danger'));
 }
 function copySharedPlan(peerId,planId){
   const friend=friendsState?.friends.find(person=>person.id===peerId);
@@ -2485,6 +2508,20 @@ document.addEventListener('click',async event=>{
       if(friendsState?.self){data.friendsId=friendsState.self.id;lastFriendsProfile='';save();render();refreshFriends();}
       break;
     case 'friend-profile':openFriend(key);break;
+    case 'friend-clan':{
+      const friend=friendsState?.friends.find(person=>person.id===key);
+      if(!friend?.clanId) break;
+      if(friend.clanId===data.clanLink){
+        dialog.close();socialTab='klan';render();refreshClan();
+      }else openClanDirectoryDetail(friend.clanId,'',key);
+      break;
+    }
+    case 'clan-directory-member':openDirectoryMember(key);break;
+    case 'clan-directory-return':{
+      const {search,friendId}=dialog.querySelector('#directory-member').dataset;
+      openClanDirectoryDetail(key,search,friendId);
+      break;
+    }
     case 'copy-shared-plan':copySharedPlan(button.dataset.peer,key);break;
     case 'friend-accept':modifyFriends({action:'accept',peer:key},button);break;
     case 'friend-decline':modifyFriends({action:'decline',peer:key},button);break;
